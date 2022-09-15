@@ -11,10 +11,31 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### Data read-in and packages
+```{r}
+pacman::p_load(DataExplorer, dplyr, arsenal)
+
+# read in data & create PRE variable
+data <- read.csv("./data/frmgham.csv") %>% mutate(PRE = ifelse(PREVCHD+PREVAP+PREVMI+PREVSTRK+PREVHYP >=1, 1, 0))
+```
+
 
 ### Data Preparation
 ```{r}
+# data type transformation
+data$SEX <- as.factor(data$SEX)
+data$PERIOD <- as.factor(data$PERIOD)
+data$CURSMOKE <- as.factor(data$CURSMOKE)
+data$PREVCHD <- as.factor(data$PREVCHD)
+data$CVD <- as.factor(data$CVD)
+data$PRE <- as.factor(data$PRE)
+# reate a new variable: preexisting condition
 
+
+# filtration
+period1 <- data %>% filter(PERIOD==1)
+period2 <- data %>% filter(PERIOD==2)
+period3 <- data %>% filter(PERIOD==3)
 ```
 
 
@@ -22,13 +43,52 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Data Explorative Analysis
 ```{r}
+# variabel type
+DataExplorer::plot_str(data)
+DataExplorer::plot_missing(data)
+DataExplorer::plot_qq(data[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
 
+# descriptive statistics for table 1
+my_labels <- list(
+  CVD = "CVD Status",
+  PERIOD = "Examination Cycle",
+  PRE = "Prev-exiating Condition",
+  CURSMOKE = "Current Smoker",
+  CIGPDAY = "Cigarettes per day"
+)
+# attr(data$SEX,'label')  <- 'Gender'
+# attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# attr(data$CVD,'label')  <- 'CVD Status'
+
+
+my_controls <- tableby.control(
+  test = T,
+  total = F,
+  numeric.test = "anova", cat.test = "chisq",
+  numeric.stats = c("meansd", "medianq1q3", "Nmiss2"),
+  cat.stats = c("countpct", "Nmiss2"),
+  stats.labels = list(
+    meansd = "Mean (SD)",
+    medianq1q3 = "Median (Q1, Q3)",
+    Nmiss2 = "Missing"
+  )
+)
+
+table <- arsenal::tableby(CVD ~ PERIOD +  SEX + PRE + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = data, control = my_controls)
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Summary Statistic of Framingham Heart Study Longitudinal Data", 
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
 ```
 
 
 ### Model Build
 ```{r}
-
+# filter for healthy smoker from period 1
 ```
 
 
