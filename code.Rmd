@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ### Data read-in and packages
+### 3 Numeric criteria to get healthy participants
 ```{r}
 pacman::p_load(DataExplorer, dplyr, arsenal)
 
@@ -32,7 +33,7 @@ data$PRE <- as.factor(data$PRE)
 # reate a new variable: preexisting condition
 
 
-# filtration
+# filtration (1-2, 1-3)
 period1 <- data %>% filter(PERIOD==1)
 period2 <- data %>% filter(PERIOD==2)
 period3 <- data %>% filter(PERIOD==3)
@@ -89,11 +90,14 @@ summary(table,
 ### Model Build
 ```{r}
 # filter for healthy smoker from period 1
+# logistic regression
+# backwards selection, interactions, confounding?
 ```
 
 
 ### Model Diagnostics
 ```{r}
-
+# assess assumptions of logi regre
+# sensitivity analysis
 ```
 
