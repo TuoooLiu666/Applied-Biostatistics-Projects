@@ -35,21 +35,22 @@ healthy_current_smoker_p2 <- period2 %>% filter(RANDID %in% healthy_current_smok
 healthy_current_smoker_p3 <- period3 %>% filter(RANDID %in% healthy_current_smoker_p1$RANDID) # forget about the name
 
 # data
-period_12 <- rbind(healthy_current_smoker_p1, healthy_current_smoker_p2)
-period_13 <- rbind(healthy_current_smoker_p1, healthy_current_smoker_p3)
+period_1 <- healthy_current_smoker_p1
+period_2 <- healthy_current_smoker_p2
+period_3 <- healthy_current_smoker_p3
 
 
 # data type transformation
-period_12$SEX <- as.factor(period_12$SEX)
-period_12$PERIOD <- as.factor(period_12$PERIOD)
-period_12$CURSMOKE <- as.factor(period_12$CURSMOKE)
-period_12$CVD <- as.factor(period_12$CVD)
+period_2$SEX <- as.factor(period_2$SEX)
+period_2$PERIOD <- as.factor(period_2$PERIOD)
+period_2$CURSMOKE <- as.factor(period_2$CURSMOKE)
+period_2$CVD <- as.factor(period_2$CVD)
 
 
-period_13$SEX <- as.factor(period_13$SEX)
-period_13$PERIOD <- as.factor(period_13$PERIOD)
-period_13$CURSMOKE <- as.factor(period_13$CURSMOKE)
-period_13$CVD <- as.factor(period_13$CVD)
+period_3$SEX <- as.factor(period_3$SEX)
+period_3$PERIOD <- as.factor(period_3$PERIOD)
+period_3$CURSMOKE <- as.factor(period_3$CURSMOKE)
+period_3$CVD <- as.factor(period_3$CVD)
 
 ```
 
@@ -58,9 +59,11 @@ period_13$CVD <- as.factor(period_13$CVD)
 
 ### Data Explorative Analysis
 ```{r results="asis"}
+# filtration on original data
+period_123 <- rbind(period_1, period_2, period_3)
 # variabel type
-DataExplorer::plot_missing(period_12)
-DataExplorer::plot_qq(period_12[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
+DataExplorer::plot_missing(period_123)
+DataExplorer::plot_qq(period_123[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
 
 # descriptive statistics for table 1
 my_labels <- list(
@@ -87,7 +90,7 @@ my_controls <- tableby.control(
   )
 )
 
-table <- arsenal::tableby(interaction(PERIOD, CVD) ~  SEX + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = period_12, control = my_controls)
+table <- arsenal::tableby(interaction(PERIOD, CVD) ~  SEX + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = period_123, control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
@@ -100,7 +103,23 @@ summary(table,
 
 
 ### Model Build
+Logistic Regression
+Provides the following unique features:
+* Hosmer-Lemeshow test of goodness of fit for the model
+* Stepwise analyses
+* Contrasts to define model parameterization
+* Alternative cut points for classification
+* Classification plots
+* Model fitted on one set of cases to a held-out set of cases
+* Saves predictions, residuals, and influence statistics
+
+
+- check on class bias
+- resample if bias is found
 ```{r}
+# class bias
+table(period_2$CVD)
+
 # logistic regression
 # backwards selection, interactions, confounding?
 ```
