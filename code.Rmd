@@ -11,7 +11,7 @@ output:
 ### environment setup if needed
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(DataExplorer, dplyr, arsenal, tidyverse, broom, MASS,MKmisc)
+pacman::p_load(DataExplorer, dplyr, arsenal, tidyverse, broom, MASS, MKmisc)
 ```
 
 ### Data read-in
@@ -107,6 +107,7 @@ summary(table,
 ```
 
 
+
 ### Model Build
 Logistic Regression
 Provides the following unique features:
@@ -118,7 +119,7 @@ Provides the following unique features:
 * Model fitted on one set of cases to a held-out set of cases
 * Saves predictions, residuals, and influence statistics
 
-
+#### PERIOD_2
 - check on class bias
 - resample if bias is found
 ```{r}
@@ -134,29 +135,66 @@ input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 
 input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
 training_ones <- input_ones[input_ones_training_rows, ]
 training_zeros <- input_zeros[input_zeros_training_rows, ]
-trainingData <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's
+trainingData_2 <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's
 
 # Create Test Data
 test_ones <- input_ones[-input_ones_training_rows, ]
 test_zeros <- input_zeros[-input_zeros_training_rows, ]
-testData <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
+testData_2 <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
 ```
 
 - model build/stepwise analysis/goodness-of-fit
 ```{r}
-trainingData <-  trainingData %>% dplyr::select(AGE, BMI,TOTCHOL,SYSBP,GLUCOSE,CVD,SEX,CURSMOKE) %>% na.omit()
-logitMod_2 <- glm(CVD ~ SEX + AGE + BMI + CURSMOKE + TOTCHOL + SYSBP + GLUCOSE, data=trainingData, family=binomial)
-predicted <- predict(logitMod_2, testData, type="response")  # predicted scores
+trainingData_2 <-  trainingData_2 %>% dplyr::select(AGE, BMI,TOTCHOL,SYSBP,GLUCOSE,CVD,SEX,CURSMOKE) %>% na.omit()
+logitMod_2 <- glm(CVD ~ SEX + AGE + BMI + CURSMOKE + TOTCHOL + SYSBP + GLUCOSE, data=trainingData_2, family=binomial)
+predicted_2 <- predict(logitMod_2, testData_2, type="response")  # predicted scores
 
 
 # stepwise: backward variable selection based on AIC
 backwards <- step(logitMod_2,trace=0) # # Backwards selection is the default , would suppress step by step output.
 formula(backwards) # get selected variables
 
-# goodness of fit test: The null hypothesis holds that the model fits the data
-MKmisc::HLgof.test(fit = fitted(logitMod_2), obs = trainingData$CVD) # p-value < 0.05
+
 ```
 SEX2,AGE,TOTCHOL, and SYSBP are selected from Backwards step-wise selection procedure. Hosmer-Lemeshow test of goodness of fit for the model produces a p-value $<0.05$, indicating poor fit of the model for our data.
+
+#### PERIOD_3
+- check on class bias
+- resample if bias is found
+```{r}
+# class bias
+table(period_3$CVD)
+
+# resample
+# Create Training Data
+input_ones <- period_3[which(period_3$CVD == 1), ]  # all 1's
+input_zeros <- period_3[which(period_3$CVD == 0), ]  # all 0's
+set.seed(100)  # for reproducibility of samples
+input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 1's for training
+input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
+training_ones <- input_ones[input_ones_training_rows, ]
+training_zeros <- input_zeros[input_zeros_training_rows, ]
+trainingData_3 <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's
+
+# Create Test Data
+test_ones <- input_ones[-input_ones_training_rows, ]
+test_zeros <- input_zeros[-input_zeros_training_rows, ]
+testData_3 <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
+```
+- model build/stepwise analysis/goodness-of-fit
+```{r}
+trainingData_3 <-  trainingData_3 %>% dplyr::select(AGE, BMI,TOTCHOL,SYSBP,GLUCOSE,CVD,SEX,CURSMOKE) %>% na.omit()
+logitMod_3 <- glm(CVD ~ SEX + AGE + BMI + CURSMOKE + TOTCHOL + SYSBP + GLUCOSE, data=trainingData_3, family=binomial)
+predicted_3 <- predict(logitMod_3, testData_3, type="response")  # predicted scores
+
+
+# stepwise: backward variable selection based on AIC
+backwards <- step(logitMod_3,trace=0) # # Backwards selection is the default , would suppress step by step output.
+formula(backwards) # get selected variables
+
+```
+SEX2,AGE,GLUCOSE are selected from Backwards step-wise selection procedure. Hosmer-Lemeshow test of goodness of fit for the model produces a p-value $<0.05$, indicating poor fit of the model for our data.
+
 
 ### Model Diagnostics
 
@@ -169,14 +207,40 @@ The logistic regression method assumes that:
 
 
 #### Linearity/influential obs
+##### Linearity
+PERIOD-2
 ```{r}
 probabilities <- predict(logitMod_2, type = "response")
 
 # Select only numeric predictors
-mydata <- trainingData %>% 
+mydata <- trainingData_2 %>% 
   dplyr::select(AGE , BMI, TOTCHOL , SYSBP , GLUCOSE) %>% 
   na.omit()
 predictors <- colnames(mydata)
+
+# Bind the logit and tidying the data for plot
+mydata <- mydata %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>% 
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+
+ggplot(mydata, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+PERIOD-3
+```{r}
+probabilities <- predict(logitMod_3, type = "response")
+
+# Select only numeric predictors
+mydata <- trainingData_3 %>% 
+  dplyr::select(AGE , BMI, TOTCHOL , SYSBP , GLUCOSE) %>% 
+  na.omit()
+predictors <- colnames(mydata)
+
 # Bind the logit and tidying the data for plot
 mydata <- mydata %>%
   mutate(logit = log(probabilities/(1-probabilities))) %>% 
@@ -191,7 +255,7 @@ ggplot(mydata, aes(logit, predictor.value))+
 ```
 The smoothed scatter plots show that variables AGE, BMI, SYSBP, GLUCOSE and TOTCHOL are all quite linearly associated with the CVD outcome in logit scale.
 
-
+##### Influential obs
 ```{r}
 # Extract model results
 model.data <- broom::augment(logitMod_2) %>% 
@@ -204,18 +268,41 @@ ggplot(model.data, aes(index, .std.resid)) +
   geom_point(aes(color = CVD), alpha = .5) +
   theme_bw()
 ```
+
+```{r}
+# Extract model results
+model.data <- broom::augment(logitMod_3) %>% 
+  mutate(index = 1:n())
+
+model.data %>% top_n(3, .cooksd)
+
+# plot
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = CVD), alpha = .5) +
+  theme_bw()
+```
 Three observations with highest standardized residuals have lower than 3 std. residual. So no influential observations are found.
 
-#### Model fit/multicollinearity
+#### multicollinearity
 ```{r}
-# assess assumptions of logi regre
-summary(logitMod_2)
-
-# VIF: multicollinearity,  VIF well below 4?
+# VIF: multicollinearity,  VIF well below 4? Yes
 car::vif(logitMod_2)
+car::vif(logitMod_3)
+```
+
+
+### Model summary, goodness-of-fit, ROC
+```{r warning=FALSE}
+summary(logitMod_2)
+summary(logitMod_3)
+# goodness of fit test: The null hypothesis holds that the model fits the data
+MKmisc::HLgof.test(fit = fitted(logitMod_2), obs = trainingData_2$CVD) # p-value < 0.05
+# goodness of fit test: The null hypothesis holds that the model fits the data
+MKmisc::HLgof.test(fit = fitted(logitMod_3), obs = trainingData_3$CVD) # p-value < 0.05
 
 # ROC
-InformationValue::plotROC(testData$CVD, predicted)
+InformationValue::plotROC(testData_2$CVD, predicted_2)
+InformationValue::plotROC(testData_2$CVD, predicted_3)
 ```
 
 
