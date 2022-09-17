@@ -2,58 +2,70 @@
 title: "code"
 author: "Tuo Liu, Ran Wei, Yujung Chen"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 
 ### environment setup if needed
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(DataExplorer, dplyr, arsenal)
 ```
 
-### Data read-in and packages
+### Data read-in
 ### 3 Numeric criteria to get healthy participants
 ```{r}
-pacman::p_load(DataExplorer, dplyr, arsenal)
-
 # read in data & create PRE variable
-data <- read.csv("./data/frmgham.csv") %>% mutate(PRE = ifelse(PREVCHD+PREVAP+PREVMI+PREVSTRK+PREVHYP >=1, 1, 0))
+data <- read.csv("./data/frmgham.csv") %>% mutate(PRE = ifelse(PREVCHD+PREVAP+PREVMI+PREVSTRK+PREVHYP+DIABETES >= 1, 1, 0))
 ```
 
 
 ### Data Preparation
 ```{r}
-# data type transformation
-data$SEX <- as.factor(data$SEX)
-data$PERIOD <- as.factor(data$PERIOD)
-data$CURSMOKE <- as.factor(data$CURSMOKE)
-data$PREVCHD <- as.factor(data$PREVCHD)
-data$CVD <- as.factor(data$CVD)
-data$PRE <- as.factor(data$PRE)
-# reate a new variable: preexisting condition
-
-
-# filtration (1-2, 1-3)
+# filtration: healthy smoker at exam (1-2, 1-3)
 period1 <- data %>% filter(PERIOD==1)
 period2 <- data %>% filter(PERIOD==2)
 period3 <- data %>% filter(PERIOD==3)
+
+# healthy: using other numeric criteria results in o observation
+healthy_current_smoker_p1 <- period1 %>% filter(CURSMOKE == 1 & PRE == 0)
+healthy_current_smoker_p2 <- period2 %>% filter(RANDID %in% healthy_current_smoker_p1$RANDID) # forget about the name
+healthy_current_smoker_p3 <- period3 %>% filter(RANDID %in% healthy_current_smoker_p1$RANDID) # forget about the name
+
+# data
+period_12 <- rbind(healthy_current_smoker_p1, healthy_current_smoker_p2)
+period_13 <- rbind(healthy_current_smoker_p1, healthy_current_smoker_p3)
+
+
+# data type transformation
+period_12$SEX <- as.factor(period_12$SEX)
+period_12$PERIOD <- as.factor(period_12$PERIOD)
+period_12$CURSMOKE <- as.factor(period_12$CURSMOKE)
+period_12$CVD <- as.factor(period_12$CVD)
+
+
+period_13$SEX <- as.factor(period_13$SEX)
+period_13$PERIOD <- as.factor(period_13$PERIOD)
+period_13$CURSMOKE <- as.factor(period_13$CURSMOKE)
+period_13$CVD <- as.factor(period_13$CVD)
+
 ```
 
 
 
 
 ### Data Explorative Analysis
-```{r}
+```{r results="asis"}
 # variabel type
-DataExplorer::plot_str(data)
-DataExplorer::plot_missing(data)
-DataExplorer::plot_qq(data[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
+DataExplorer::plot_missing(period_12)
+DataExplorer::plot_qq(period_12[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
 
 # descriptive statistics for table 1
 my_labels <- list(
   CVD = "CVD Status",
   PERIOD = "Examination Cycle",
-  PRE = "Prev-exiating Condition",
   CURSMOKE = "Current Smoker",
   CIGPDAY = "Cigarettes per day"
 )
@@ -75,7 +87,7 @@ my_controls <- tableby.control(
   )
 )
 
-table <- arsenal::tableby(CVD ~ PERIOD +  SEX + PRE + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = data, control = my_controls)
+table <- arsenal::tableby(interaction(PERIOD, CVD) ~  SEX + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = period_12, control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
@@ -89,7 +101,6 @@ summary(table,
 
 ### Model Build
 ```{r}
-# filter for healthy smoker from period 1
 # logistic regression
 # backwards selection, interactions, confounding?
 ```
