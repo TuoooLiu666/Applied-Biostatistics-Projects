@@ -1,0 +1,53 @@
+---
+title: "report"
+author: "Yujung Chen, Ran Wei, Tuo Liu"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+
+### Introduction
+
+#### Background and rationale
+#### Objectives
+
+### Study design, setting, participants
+#### Study design
+#### Sample Size
+
+
+### Measures
+#### Outcome
+- Primary outcome
+
+- Secondary outcome
+
+- Measurement & transformation
+
+#### Exposure and covariates
+- Main exposure
+- Covariates
+- Measurement & transformation
+
+
+### Statistical methods (20%)
+#### Model choice and rationale
+#### Assumption check methods
+#### Covariate adjustment
+#### Alternative model (survival model)
+#### Missing data
+#### Sensitivity analysis
+
+
+### Results-text/table/fig
+
+Table 1 descriptive statistics
+Table 2 covariates, model description
+Table 3 covariate selection or alternative model 
+Figure 1 bar chart
+Figure 2 survival plot
+
+### Discussion 
+
+
+### Reference
