@@ -57,6 +57,14 @@ period_3$PERIOD <- as.factor(period_3$PERIOD)
 period_3$CURSMOKE <- as.factor(period_3$CURSMOKE)
 period_3$CVD <- as.factor(period_3$CVD)
 
+
+###### updated period 3 contains current smoker who's been smoking since period 1
+###### and smoking quitter who quitted smoking since period 1.
+all_period_smoker <- period_3[(period_3$CURSMOKE == "1") & 
+                                period_3$RANDID %in% period_2[period_2$CURSMOKE == "1",]$RANDID, ]
+all_period_quiter <- period_3[(period_3$CURSMOKE == "0") & 
+                                period_3$RANDID %in% period_2[period_2$CURSMOKE == "0",]$RANDID, ]
+period_3_updated <- rbind(all_period_quiter,all_period_smoker)
 ```
 
 
@@ -161,14 +169,16 @@ SEX2,AGE,TOTCHOL, and SYSBP are selected from Backwards step-wise selection proc
 #### PERIOD_3
 - check on class bias
 - resample if bias is found
+
+**** I changed the period_3 to period_3_updated in order to test the new dataset *****
 ```{r}
 # class bias
-table(period_3$CVD)
+table(period_3_updated$CVD)
 
 # resample
 # Create Training Data
-input_ones <- period_3[which(period_3$CVD == 1), ]  # all 1's
-input_zeros <- period_3[which(period_3$CVD == 0), ]  # all 0's
+input_ones <- period_3_updated[which(period_3_updated$CVD == 1), ]  # all 1's
+input_zeros <- period_3_updated[which(period_3_updated$CVD == 0), ]  # all 0's
 set.seed(100)  # for reproducibility of samples
 input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 1's for training
 input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
