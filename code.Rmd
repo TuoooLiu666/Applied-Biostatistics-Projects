@@ -71,6 +71,37 @@ period_3_updated <- rbind(all_period_quiter,all_period_smoker)
 
 
 ### Data Explorative Analysis
+```{r}
+# plots by smoke status
+ggplot(data=period_123, aes(x=CURSMOKE, y=BMI)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=CURSMOKE, y=SYSBP)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=CURSMOKE, y=DIABP)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=CURSMOKE, y=TOTCHOL)) + geom_boxplot()+ facet_wrap(~PERIOD)
+
+# plots by sex
+ggplot(data=period_123, aes(x=SEX, y=BMI)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=SEX, y=SYSBP)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=SEX, y=DIABP)) + geom_boxplot()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=SEX, y=TOTCHOL)) + geom_boxplot()+ facet_wrap(~PERIOD)
+
+# plots by age
+ggplot(data=period_123, aes(x=AGE, y=BMI)) + geom_point()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=AGE, y=SYSBP)) + geom_point()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=AGE, y=DIABP)) + geom_point()+ facet_wrap(~PERIOD)
+ggplot(data=period_123, aes(x=AGE, y=TOTCHOL)) + geom_point()+ facet_wrap(~PERIOD)
+
+# 2x2 table by sex and smoking
+period_2 %>% group_by(SEX,CURSMOKE) %>% mutate(n=n()) %>% 
+        group_by(CURSMOKE) %>% distinct(CURSMOKE,SEX,n)%>%
+        mutate(Per=n/sum(n), np=paste0(n," (",round(Per*100,2)," %)")) %>%
+        dplyr::select(-n,-Per) %>% spread(CURSMOKE,np)
+
+period_3_updated %>% group_by(SEX,CURSMOKE) %>% mutate(n=n()) %>% 
+        group_by(CURSMOKE) %>% distinct(CURSMOKE,SEX,n)%>%
+        mutate(Per=n/sum(n), np=paste0(n," (",round(Per*100,2)," %)")) %>%
+        dplyr::select(-n,-Per) %>% spread(CURSMOKE,np)
+```
+
 ```{r results="asis"}
 # filtration on original data
 period_123 <- rbind(period_1, period_2, period_3)
@@ -113,6 +144,7 @@ summary(table,
   digits=1
 )
 ```
+
 
 
 
@@ -201,7 +233,6 @@ predicted_3 <- predict(logitMod_3, testData_3, type="response")  # predicted sco
 # stepwise: backward variable selection based on AIC
 backwards <- step(logitMod_3,trace=0) # # Backwards selection is the default , would suppress step by step output.
 formula(backwards) # get selected variables
-
 ```
 SEX2,AGE,GLUCOSE are selected from Backwards step-wise selection procedure. Hosmer-Lemeshow test of goodness of fit for the model produces a p-value $<0.05$, indicating poor fit of the model for our data.
 
@@ -319,15 +350,139 @@ InformationValue::plotROC(testData_2$CVD, predicted_3)
 
 
 
-#### Interaction/confounding
-```{r}
-
-```
-
-
-
 #### sensitivity analysis
+##### categorizing covariates
+According to the model assumption assessment results for linearity between logit and continuous variables, linearity is not shown in all pairs. Moreover, scales of continuous variables before centering may impede model fit. 
+<!-- # threshold -->
+<!-- # AGE      age groups by 65 1/2 -->
+<!-- # BMI 30  healthy/overweight 1/2 -->
+<!-- # TOTCHOL 160 low/high 1/2 -->
+<!-- # SYSBP  130 low/high 1/2 -->
+<!-- # GLUCOSE 200 low/high 1/2 -->
 ```{r}
+# PERIOD_2
+period_2$agegrp <- ifelse(period_2$AGE>65,2, 1) %>% as.factor()
+period_2$bmigrp <- ifelse(period_2$BMI>=30, 2, 1) %>% as.factor()
+period_2$TOTCHOLgrp <- ifelse(period_2$TOTCHOL>=160, 2, 1) %>% as.factor()
+period_2$SYSBPgrp <- ifelse(period_2$SYSBP>=130, 2,1) %>% as.factor()
+period_2$GLUCOSEgrp <- ifelse(period_2$GLUCOSE>=200, 2, 1) %>% as.factor()
 
+
+# class bias
+table(period_2$CVD)
+table(period_2$agegrp)
+
+
+# resample
+# Create Training Data
+input_ones <- period_2[which(period_2$CVD == 1), ]  # all 1's
+input_zeros <- period_2[which(period_2$CVD == 0), ]  # all 0's
+set.seed(100)  # for reproducibility of samples
+input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 1's for training
+input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
+training_ones <- input_ones[input_ones_training_rows, ]
+training_zeros <- input_zeros[input_zeros_training_rows, ]
+trainingData_21 <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's
+
+# Create Test Data
+test_ones <- input_ones[-input_ones_training_rows, ]
+test_zeros <- input_zeros[-input_zeros_training_rows, ]
+testData_21 <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
+
+
+# model fit
+trainingData_21 <-  trainingData_21 %>% dplyr::select(agegrp, bmigrp,TOTCHOLgrp,SYSBPgrp,GLUCOSEgrp,CVD,SEX,CURSMOKE) %>% na.omit()
+logitMod_21 <- glm(CVD ~ SEX + agegrp +  bmigrp + CURSMOKE + TOTCHOLgrp + SYSBPgrp, data=trainingData_21, family=binomial)
+predicted_21 <- predict(logitMod_21, testData_21, type="response")  # predicted scores
+summary(logitMod_21)
+
+# reduced model
+# logitMod_22 <- glm(CVD ~ CURSMOKE, data=trainingData_21, family=binomial)
+# summary(logitMod_22)
+
+
+# stepwise: backward variable selection based on AIC
+backwards <- step(logitMod_21,trace=0) # # Backwards selection is the default , would suppress step by step output.
+formula(backwards) # get selected variables
 ```
+```{r} 
+period_3_updated$agegrp <- ifelse(period_3_updated$AGE>65,2, 1) %>% as.factor()
+period_3_updated$bmigrp <- ifelse(period_3_updated$BMI>=30, 2, 1) %>% as.factor()
+period_3_updated$TOTCHOLgrp <- ifelse(period_3_updated$TOTCHOL>=160, 2, 1) %>% as.factor()
+period_3_updated$SYSBPgrp <- ifelse(period_3_updated$SYSBP>=130, 2,1) %>% as.factor()
+period_3_updated$GLUCOSEgrp <- ifelse(period_3_updated$GLUCOSE>=200, 2, 1) %>% as.factor()
+
+
+# class bias
+table(period_3_updated$CVD)
+table(period_3_updated$agegrp)
+
+
+# resample
+# Create Training Data
+input_ones <- period_3_updated[which(period_3_updated$CVD == 1), ]  # all 1's
+input_zeros <- period_3_updated[which(period_3_updated$CVD == 0), ]  # all 0's
+set.seed(100)  # for reproducibility of samples
+input_ones_training_rows <- sample(1:nrow(input_ones), 0.7*nrow(input_ones))  # 1's for training
+input_zeros_training_rows <- sample(1:nrow(input_zeros), 0.7*nrow(input_ones))  # 0's for training. Pick as many 0's as 1's
+training_ones <- input_ones[input_ones_training_rows, ]
+training_zeros <- input_zeros[input_zeros_training_rows, ]
+trainingData_31 <- rbind(training_ones, training_zeros)  # row bind the 1's and 0's
+
+# Create Test Data
+test_ones <- input_ones[-input_ones_training_rows, ]
+test_zeros <- input_zeros[-input_zeros_training_rows, ]
+testData_31 <- rbind(test_ones, test_zeros)  # row bind the 1's and 0's
+
+
+# model fit
+trainingData_31 <-  trainingData_31 %>% dplyr::select(agegrp, bmigrp,TOTCHOLgrp,SYSBPgrp,GLUCOSEgrp,CVD,SEX,CURSMOKE) %>% na.omit()
+logitMod_31 <- glm(CVD ~ SEX + agegrp +  bmigrp + CURSMOKE + TOTCHOLgrp + SYSBPgrp, data=trainingData_31, family=binomial)
+predicted_31 <- predict(logitMod_31, testData_31, type="response")  # predicted scores
+summary(logitMod_31)
+
+# stepwise: backward variable selection based on AIC
+backwards <- step(logitMod_31,trace=0) # # Backwards selection is the default , would suppress step by step output.
+formula(backwards) # get selected variables
+```
+
+
+#### Interaction/confounding
+##### gender masking smoking:cvd?
+```{r}
+# check distribution
+period_3_updated %>% group_by(SEX,CURSMOKE) %>% mutate(n=n()) %>% 
+        group_by(CURSMOKE) %>% distinct(CURSMOKE,SEX,n)%>%
+        mutate(Per=n/sum(n), np=paste0(n," (",round(Per*100,2)," %)")) %>%
+        dplyr::select(-n,-Per) %>% spread(CURSMOKE,np)
+
+# model fit
+logitMod_31 <- glm(CVD ~ SEX + agegrp +  bmigrp + CURSMOKE + TOTCHOLgrp + SYSBPgrp + agegrp:CURSMOKE, data=trainingData_31, family=binomial)
+summary(logitMod_31)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
