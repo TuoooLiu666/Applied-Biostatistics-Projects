@@ -1,5 +1,5 @@
 ---
-title: "report"
+title: "Proect 1 Report"
 author: "Yujung Chen, Ran Wei, Tuo Liu"
 date: "`r Sys.Date()`"
 output: pdf_document
@@ -10,6 +10,7 @@ output: pdf_document
 
 #### Background and rationale
 #### Objectives
+To assess the relation between quitting smoking the likelihood of incident cardiovascular disease. We hypothesize that free living adult who quitted smoking would have a lower risk of incident cardiovascular disease than that of who continued smoking.
 
 ### Study design, setting, participants
 #### Study design
@@ -19,10 +20,12 @@ output: pdf_document
 ### Measures
 #### Outcome
 - Primary outcome
-
+The primary response of interest was CVD status among participants at multiple examination cycle from the Framingham Heart Study. 
 - Secondary outcome
 
 - Measurement & transformation
+Main outcomes, CVD status,  was measured as a binary variable, encoded with 0 if no CVD disease condition was reported at each of three examination cycles and 1 if CVD condition was reported.
+
 
 #### Exposure and covariates
 - Main exposure
@@ -30,9 +33,14 @@ output: pdf_document
 - Measurement & transformation
 
 
-### Statistical methods (20%)
+### Statistical methods
 #### Model choice and rationale
+The main response variable was binary as encoded 0/1, and the main predictor was bianry with covariates being continuous and categorical variables,  which ascertained the eligibility of the application of logistic regression model on the data at hand.
+
 #### Assumption check methods
+Primarily, we used graphical approach, together with appropriate metrics,  to assess assumptions made for the logistic regression model. Relevant statistical tests were also employed here to test for certain characteristic of the model, i.e. goodness-of-fit.
+
+
 #### Covariate adjustment
 #### Alternative model (survival model)
 #### Missing data
@@ -51,3 +59,11 @@ Figure 2 survival plot
 
 
 ### Reference
+
+
+
+### Appendix 1
+Model assumption assessment
+
+### Appendix 2
+Show relevant statistical code
