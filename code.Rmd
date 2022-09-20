@@ -328,6 +328,15 @@ library(ranger)
 library(ggplot2)
 library(dplyr)
 library(ggfortify)
+
+# Generate continuous smoker through out 3 periods, and their covariates at p1
+# Generate smoking quitter since p1, and their covariates at p1.
+conti_smoker_p1 <- period_1[period_1$RANDID %in% all_period_smoker$RANDID,]
+conti_smoker_p1$smoke <- 1
+quiter_p1 <- period_1[period_1$RANDID %in% all_period_quiter$RANDID,]
+quiter_p1$smoke <- 0
+survival_p1 <- rbind(conti_smoker_p1, quiter_p1)
+survival_p1$CVD <- as.numeric(survival_p1$CVD)
 ```
 
 ### Categorizing covariates
