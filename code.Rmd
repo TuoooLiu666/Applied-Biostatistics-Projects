@@ -26,9 +26,9 @@ data <- read.csv("./data/frmgham.csv") %>% mutate(PRE = ifelse(PREVCHD+PREVAP+PR
 We restrict our analyses to continued smoker and non-smokers assuming that long exposure period presents better association with CVD, if any. 
 ```{r}
 # filtration: healthy smoker at exam (1-2, 1-3)
-period1 <- data %>% filter(PERIOD==1)
-period2 <- data %>% filter(PERIOD==2)
-period3 <- data %>% filter(PERIOD==3)
+period_1 <- data %>% filter(PERIOD==1)
+period_2 <- data %>% filter(PERIOD==2)
+period_3 <- data %>% filter(PERIOD==3)
 
 
 # data type transformation
