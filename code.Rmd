@@ -459,10 +459,130 @@ period_3_updated %>% group_by(SEX,CURSMOKE) %>% mutate(n=n()) %>%
 # model fit
 logitMod_31 <- glm(CVD ~ SEX + agegrp +  bmigrp + CURSMOKE + TOTCHOLgrp + SYSBPgrp + agegrp:CURSMOKE, data=trainingData_31, family=binomial)
 summary(logitMod_31)
+
 ```
 
 
 
+
+#### Survival Analysis
+#### Load packages and data
+```{r}
+library(survival)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+
+# Generate continuous smoker through out 3 periods, and their covariates at p1
+# Generate smoking quitter since p1, and their covariates at p1.
+conti_smoker_p1 <- period_1[period_1$RANDID %in% all_period_smoker$RANDID,]
+conti_smoker_p1$smoke <- 1
+quiter_p1 <- period_1[period_1$RANDID %in% all_period_quiter$RANDID,]
+quiter_p1$smoke <- 0
+survival_p1 <- rbind(conti_smoker_p1, quiter_p1)
+survival_p1$CVD <- as.numeric(survival_p1$CVD)
+```
+
+### Categorizing covariates
+```{r}
+survival_p1$smoke<- ifelse(survival_p1$smoke == 1, "Persistent Smoker", "Smoking Quiter") %>% as.factor()
+survival_p1$smoke = relevel(survival_p1$smoke, ref = "Persistent Smoker")
+survival_p1$agegrp <- ifelse(survival_p1$AGE>=50,"50 and older", "younger than 50") %>% as.factor()
+survival_p1$agegrp = relevel(survival_p1$agegrp, ref = "younger than 50")
+survival_p1$bmigrp <- ifelse(survival_p1$BMI>=25, "Overweight", "Normal") %>% as.factor()
+survival_p1$bmigrp = relevel(survival_p1$bmigrp, ref = "Normal")
+survival_p1$TOTCHOLgrp <- ifelse(survival_p1$TOTCHOL>=200, "High Cholesterol", "Normal") %>% as.factor()
+survival_p1$TOTCHOLgrp = relevel(survival_p1$TOTCHOLgrp, ref = "Normal")
+survival_p1$SYSBPgrp <- ifelse(survival_p1$SYSBP>=130, "High Blood Pressure","Normal") %>% as.factor()
+survival_p1$SYSBPgrp = relevel(survival_p1$SYSBPgrp, ref = "Normal")
+survival_p1$GLUCOSEgrp <- ifelse(survival_p1$GLUCOSE>=100, "High Glucose", "Normal") %>% as.factor()
+survival_p1$GLUCOSEgrp = relevel(survival_p1$GLUCOSEgrp, ref = "Normal")
+survival_p1$CIGPDAYgrp <- ifelse(survival_p1$CIGPDAY <= 15, "Light Smoker", "Heavy Smoker") %>% as.factor()
+survival_p1$CIGPDAYgrp = relevel(survival_p1$CIGPDAYgrp, ref = "Light Smoker")
+survival_p1$SEXgrp <- ifelse(survival_p1$SEX == 2, "Women", "Men") %>% as.factor()
+survival_p1$SEXgrp = relevel(survival_p1$SEXgrp, ref = "Women")
+```
+
+#### Survival Model of CVD in relation to quiting smoking
+```{r}
+kaplan_meier <- with(survival_p1, Surv(TIMECVD, CVD))
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ smoke, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ CIGPDAYgrp, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ SEXgrp, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ agegrp, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ bmigrp, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ TOTCHOLgrp, data = survival_p1)
+autoplot(km_fit)
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ SYSBPgrp, data = survival_p1)
+autoplot(km_fit)
+```
+
+#### Cox Proportional Hazards Model
+```{r}
+cox <- coxph(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
+                                           TOTCHOLgrp + SYSBPgrp, data = survival_p1)
+summary(cox)
+
+cox_fit <- survfit(cox)
+autoplot(cox_fit)
+```
+#### Checking the assumptions of the Cox Proportional Hazard's model
+#### i.e covariates do not vary with time
+```{r}
+aa_fit <- aareg(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
+                                           TOTCHOLgrp + SYSBPgrp, data = survival_p1)
+
+aa_fit
+
+autoplot(aa_fit)
+```
+####  Random Forests Model
+```{r}
+# Ranger model
+survival_p1_complete <- na.omit(survival_p1[,c("TIMECVD","CVD", "smoke","CIGPDAYgrp","SEXgrp",
+                                               "agegrp", "bmigrp", "TOTCHOLgrp","SYSBPgrp")])
+r_fit <- ranger(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
+                TOTCHOLgrp + SYSBPgrp, data = survival_p1_complete, mtry = 4,
+                importance = "permutation", splitrule = "extratrees", verbose = TRUE)
+
+# Average the survival models
+CVD_time <- r_fit$unique.death.times
+surv_prob <- data.frame(r_fit$survival)
+avg_prob <- sapply(surv_prob, mean)
+
+# Plot the survival models for each subjects
+plot(r_fit$unique.death.times, r_fit$survival[1,], type = "l", ylim = c(0,1),
+     col = "red", xlab = "Days", ylab = "Free from CVD", main = "Subject CVD Curves")
+
+cols <- colors()
+for (n in sample(c(2:dim(survival_p1_complete)[1]), 20)){
+  lines(r_fit$unique.death.times, r_fit$survival[n,], type = "l", col = cols[n])
+}
+lines(CVD_time, avg_prob, lwd = 2)
+legend(500, 0.7, legend = c('Average = black'))
+
+
+# Rank variable importance
+vi <- data.frame(sort(round(r_fit$variable.importance, 4), decreasing = TRUE))
+names(vi) <- "importance"
+head(vi)
+
+# Prediction Error
+cat("Prediction Error = 1 - Harrell's c-index = ", r_fit$prediction.error)
+```
+####
 
 
 
