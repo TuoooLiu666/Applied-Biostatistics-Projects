@@ -441,12 +441,17 @@ cat("Prediction Error = 1 - Harrell's c-index = ", r_fit$prediction.error)
 ### table 2
 ```{r}
 # table 2: coeficients
-logit <- tidy(logitMod_3)
-logit
-cox_coe <- tidy(cox)
-cox_coe
+logit_coe <- logitMod_3 %>%
+                 tidy(conf.int = TRUE, exponentiate = TRUE) %>%
+                 dplyr::select(term, estimate, starts_with("conf"), p.value)
 
-rbind(logit, cox_coe) %>% knitr::kable(digits = 3)
+
+cox_coe <- cox %>% 
+  tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
+  dplyr::select(term, estimate, starts_with("conf"), p.value)
+
+
+rbind(logit_coe, cox_coe) %>% knitr::kable(digits = 3)
 ```
 
 
