@@ -83,25 +83,25 @@ ggplot(data=dat, aes(x=AGE, y=SYSBP)) + geom_point()+ facet_wrap(~PERIOD)
 ggplot(data=dat, aes(x=AGE, y=DIABP)) + geom_point()+ facet_wrap(~PERIOD)
 ggplot(data=dat, aes(x=AGE, y=TOTCHOL)) + geom_point()+ facet_wrap(~PERIOD)
 
-# 2x2 table by sex and smoking
-# dat %>% group_by(SEX,CURSMOKE) %>% mutate(n=n()) %>% 
-#         group_by(CURSMOKE) %>% distinct(CURSMOKE,SEX,n)%>%
-#         mutate(Per=n/sum(n), np=paste0(n," (",round(Per*100,2)," %)")) %>%
-#         dplyr::select(-n,-Per) %>% spread(CURSMOKE,np)
+
 ```
 
 Table 1 using period 1 and 3 stratified by CVD status.
 ```{r results="asis"}
 # variabel type
 DataExplorer::plot_missing(dat)
-DataExplorer::plot_qq(dat[,c("AGE", "BMI", "SYSBP", "DIABP", "TOTCHOL")])
+DataExplorer::plot_qq(dat[,c("AGE", "BMI", "SYSBP", "TOTCHOL", "GLUCOSE")])
 
 # descriptive statistics for table 1
 my_labels <- list(
   CVD = "CVD Status",
   PERIOD = "Examination Cycle",
+  GLUCOSE = "Casual serum glucose (mg/dL)",
   CURSMOKE = "Current Smoker",
-  CIGPDAY = "Cigarettes per day"
+  CIGPDAY = "Cigarettes per day",
+  BMI = "BMI (kg/m2)",
+  SYSBP = "Systolic Blood Pressure (mmHg)",
+  TOTCHOL = "Serum Total Cholesterol (mg/dL)"
 )
 # attr(data$SEX,'label')  <- 'Gender'
 # attr(data$PERIOD,'label')  <- 'Examination Cycle'
@@ -121,7 +121,7 @@ my_controls <- tableby.control(
   )
 )
 
-table <- arsenal::tableby(interaction(PERIOD, CVD) ~  SEX + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + DIABP + TOTCHOL, data = dat, control = my_controls)
+table <- arsenal::tableby(interaction(PERIOD, CVD) ~  SEX + CURSMOKE + CIGPDAY + AGE + BMI + SYSBP + TOTCHOL+GLUCOSE, data = dat, control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
@@ -194,6 +194,7 @@ The logistic regression method assumes that:
 * There is no high inter-correlations (i.e. multicollinearity) among the predictors.
 
 
+
 #### Linearity/influential obs
 ##### Linearity
 ```{r}
@@ -250,9 +251,6 @@ MKmisc::HLgof.test(fit = fitted(logitMod_3), obs = trainingData_3$CVD) # p-value
 # ROC
 InformationValue::plotROC(testData_3$CVD, predicted_3)
 ```
-
-
-
 
 
 #### sensitivity analysis
@@ -440,7 +438,16 @@ cat("Prediction Error = 1 - Harrell's c-index = ", r_fit$prediction.error)
 
 
 
+### table 2
+```{r}
+# table 2: coeficients
+logit <- tidy(logitMod_3)
+logit
+cox_coe <- tidy(cox)
+cox_coe
 
+rbind(logit, cox_coe) %>% knitr::kable(digits = 3)
+```
 
 
 
