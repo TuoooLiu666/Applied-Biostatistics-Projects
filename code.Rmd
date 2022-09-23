@@ -339,17 +339,17 @@ survival_p1$CVD <- as.numeric(survival_p1$CVD)
 
 ### Categorizing covariates
 ```{r}
-survival_p1$smoke<- ifelse(survival_p1$smoke == 1, "Persistent Smoker", "Smoking Quiter") %>% as.factor()
-survival_p1$smoke = relevel(survival_p1$smoke, ref = "Persistent Smoker")
-survival_p1$agegrp <- ifelse(survival_p1$AGE>=50,"50 and older", "younger than 50") %>% as.factor()
-survival_p1$agegrp = relevel(survival_p1$agegrp, ref = "younger than 50")
-survival_p1$bmigrp <- ifelse(survival_p1$BMI>=25, "Overweight", "Normal") %>% as.factor()
+survival_p1$smoke<- ifelse(survival_p1$smoke == 1, "Continuing Smoker", "Former Smoker") %>% as.factor()
+survival_p1$smoke = relevel(survival_p1$smoke, ref = "Continuing Smoker")
+survival_p1$agegrp <- ifelse(survival_p1$AGE>=60,"older than 60", "60 or younger") %>% as.factor()
+survival_p1$agegrp = relevel(survival_p1$agegrp, ref = "60 or younger")
+survival_p1$bmigrp <- ifelse(survival_p1$BMI>=30, "Obese", "Normal") %>% as.factor()
 survival_p1$bmigrp = relevel(survival_p1$bmigrp, ref = "Normal")
 survival_p1$TOTCHOLgrp <- ifelse(survival_p1$TOTCHOL>=200, "High Cholesterol", "Normal") %>% as.factor()
 survival_p1$TOTCHOLgrp = relevel(survival_p1$TOTCHOLgrp, ref = "Normal")
 survival_p1$SYSBPgrp <- ifelse(survival_p1$SYSBP>=130, "High Blood Pressure","Normal") %>% as.factor()
 survival_p1$SYSBPgrp = relevel(survival_p1$SYSBPgrp, ref = "Normal")
-survival_p1$GLUCOSEgrp <- ifelse(survival_p1$GLUCOSE>=100, "High Glucose", "Normal") %>% as.factor()
+survival_p1$GLUCOSEgrp <- ifelse(survival_p1$GLUCOSE>=200, "Diabetes", "Normal") %>% as.factor()
 survival_p1$GLUCOSEgrp = relevel(survival_p1$GLUCOSEgrp, ref = "Normal")
 survival_p1$CIGPDAYgrp <- ifelse(survival_p1$CIGPDAY <= 15, "Light Smoker", "Heavy Smoker") %>% as.factor()
 survival_p1$CIGPDAYgrp = relevel(survival_p1$CIGPDAYgrp, ref = "Light Smoker")
@@ -360,32 +360,74 @@ survival_p1$SEXgrp = relevel(survival_p1$SEXgrp, ref = "Women")
 #### Survival Model of CVD in relation to quiting smoking
 ```{r}
 kaplan_meier <- with(survival_p1, Surv(TIMECVD, CVD))
+
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ smoke, data = survival_p1)
-autoplot(km_fit)
+sp1 <- autoplot(km_fit,fun="event", title="CVD risk by smoking status", ) +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ CIGPDAYgrp, data = survival_p1)
-autoplot(km_fit)
+sp2 <- autoplot(km_fit,fun="event", title="CVD risk by daily cigarettes usage") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ SEXgrp, data = survival_p1)
-autoplot(km_fit)
+sp3 <- autoplot(km_fit,fun="event", title="CVD risk by sex") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
+
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ agegrp, data = survival_p1)
-autoplot(km_fit)
+sp4 <- autoplot(km_fit,fun="event", title="CVD risk by age") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
+
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ bmigrp, data = survival_p1)
-autoplot(km_fit)
+sp5 <- autoplot(km_fit, fun="event", title="CVD risk by obesity") +
+  labs(x="",y="") + theme(legend.title=element_blank()) +
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ TOTCHOLgrp, data = survival_p1)
-autoplot(km_fit)
+sp6 <- autoplot(km_fit,fun="event", title="CVD risk by cholesterol level") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
+
 
 km_fit <- survfit(Surv(TIMECVD, CVD) ~ SYSBPgrp, data = survival_p1)
-autoplot(km_fit)
+sp7 <- autoplot(km_fit,fun="event", title="CVD risk by blod pressure") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
+
+km_fit <- survfit(Surv(TIMECVD, CVD) ~ GLUCOSEgrp, data = survival_p1)
+sp8 <- autoplot(km_fit,fun="event", title="CVD risk by diabeteic status") +
+  labs(x="",y="") + theme(legend.title=element_blank())+
+  theme(legend.key.size = unit(0.1, "cm")) + theme(legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black"))
+
+library(patchwork)
+ylab <- "CVD probability"
+xlab <- "Time after the first examination cycle (day)"
+
+sp1+sp2+sp3+sp4+sp5+sp6+sp7+sp8+plot_layout(ncol=2)
+
+grid::grid.draw(grid::textGrob(ylab, x=0.02, rot = 90))
+grid::grid.draw(grid::textGrob(xlab, y=0.02))
+
+# ggsave("survival_analysis.pdf", scale = 2)
 ```
 
 #### Cox Proportional Hazards Model
 ```{r}
 cox <- coxph(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
-                                           TOTCHOLgrp + SYSBPgrp, data = survival_p1)
+                                           TOTCHOLgrp + SYSBPgrp + GLUCOSEgrp, data = survival_p1)
 summary(cox)
 
 cox_fit <- survfit(cox)
@@ -395,45 +437,11 @@ autoplot(cox_fit)
 #### i.e covariates do not vary with time
 ```{r}
 aa_fit <- aareg(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
-                                           TOTCHOLgrp + SYSBPgrp, data = survival_p1)
+                                           TOTCHOLgrp + SYSBPgrp + GLUCOSEgrp, data = survival_p1)
 
 aa_fit
 
-autoplot(aa_fit)
-```
-####  Random Forests Model
-```{r}
-# Ranger model
-survival_p1_complete <- na.omit(survival_p1[,c("TIMECVD","CVD", "smoke","CIGPDAYgrp","SEXgrp",
-                                               "agegrp", "bmigrp", "TOTCHOLgrp","SYSBPgrp")])
-r_fit <- ranger(Surv(TIMECVD, CVD) ~ smoke + CIGPDAYgrp + SEXgrp + agegrp + bmigrp +
-                TOTCHOLgrp + SYSBPgrp, data = survival_p1_complete, mtry = 4,
-                importance = "permutation", splitrule = "extratrees", verbose = TRUE)
-
-# Average the survival models
-CVD_time <- r_fit$unique.death.times
-surv_prob <- data.frame(r_fit$survival)
-avg_prob <- sapply(surv_prob, mean)
-
-# Plot the survival models for each subjects
-plot(r_fit$unique.death.times, r_fit$survival[1,], type = "l", ylim = c(0,1),
-     col = "red", xlab = "Days", ylab = "Free from CVD", main = "Subject CVD Curves")
-
-cols <- colors()
-for (n in sample(c(2:dim(survival_p1_complete)[1]), 20)){
-  lines(r_fit$unique.death.times, r_fit$survival[n,], type = "l", col = cols[n])
-}
-lines(CVD_time, avg_prob, lwd = 2)
-legend(500, 0.7, legend = c('Average = black'))
-
-
-# Rank variable importance
-vi <- data.frame(sort(round(r_fit$variable.importance, 4), decreasing = TRUE))
-names(vi) <- "importance"
-head(vi)
-
-# Prediction Error
-cat("Prediction Error = 1 - Harrell's c-index = ", r_fit$prediction.error)
+autoplot(aa_fit, xlab="Time after the first examination cycle (day)",ylab="Effects on CVD over time")
 ```
 
 
