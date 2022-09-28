@@ -4,3 +4,7 @@ This repository commits to the application of biostatistics knowledge on clinica
 - Proj 1:
   - data source: Framingham longitudinal heart study
   - research question: Does quitting smoking reduce the likelihood of incident cardiovascular disease?
+  
+- Proj 2:
+  - data source: National Health and Nutrition Examination Survey (NHANES) 2017-2018 data
+  - research question: Is vaping associated with increased blood lead levels? Is there effect modification by age or gender?
