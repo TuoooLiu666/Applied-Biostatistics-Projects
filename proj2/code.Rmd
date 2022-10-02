@@ -7,6 +7,99 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(survey, tidyverse, DataExplorer)
 ```
 
+
+### data read-in
+
+```{r}
+data <- read.csv("./data/nhanes.csv")
+glimpse(data)
+```
+- RIDAGEYR - Age in years at screening
+- WTINT2YR - Full sample 2 year interview weight
+- WTMEC2YR - Full sample 2 year MEC exam weight
+- SDMVPSU - Masked variance pseudo-PSU
+- SDMVSTRA - Masked variance pseudo-stratum
+
+
+- SMQ020 - Smoked at least 100 cigarettes in life
+- SMQ040 - Do you now smoke cigarettes?
+- SMQ900 - Ever used an e-cigarette?
+- SMQ905 - How many days used an e-cigarette?
+- SMQ681 - Smoked tobacco last 5 days?
+- SMQ690H - Used last 5 days - E-cigarettes
+- SMQ720 - # cigarettes smoked per day
+- SMQ849 - # days smoked e-cigarette last 5 days
+- SMDANY - Used any tobacco product last 5 days?
+
+- LBXBPB - Blood lead (ug/dL)
+- BMXBMI - Body Mass Index (kg/m**2)
+
+- ALQ111 - Ever had a drink of any kind of alcohol
+- ALQ121 - Past 12 mo how often have alcohol drink
+- ALQ130 - Avg # alcohol drinks/day - past 12 mos
+- ALQ142 - # days have 4 or 5 drinks/past 12 mos
+- ALQ270 - # times 4-5 drinks in 2 hrs/past 12 mos
+- ALQ280 - # times 8+ drinks in 1 day/past 12 mos
+- ALQ290 - # times 12+ drinks in 1 day/past 12 mos
+- ALQ151 - Ever have 4/5 or more drinks every day?
+- ALQ170 - Past 30 days # times 4-5 drinks on an oc
+
+### descriptive statistics
+
+Shortly after, each individual will submit descriptive statistics for that plan.
+This individual submission should include a very brief discussion of the objectives
+of the project and the sample, and identify and define outcomes, the exposure or
+treatment and important predictors. One component of the submission is a shell
+table that will align with Table 1 in the final report. The submitted shell table is
+empty. Individuals also provide code and output (in an Appendix) that could be
+used to populate the table (i.e. every item listed in the shell table could be filled
+with the provided output). All of this should be submitted in a single document.
+
+```{r results="asis"}
+# variabel type
+DataExplorer::plot_missing(data)
+DataExplorer::plot_qq(data[,c("RIDAGEYR", "BMXBMI", "LBXBPB")])
+
+# descriptive statistics for table 1
+my_labels <- list(
+  CVD = "CVD Status",
+  PERIOD = "Examination Cycle",
+  GLUCOSE = "Casual serum glucose (mg/dL)",
+  CURSMOKE = "Current Smoker",
+  CIGPDAY = "Cigarettes per day",
+  BMI = "BMI (kg/m2)",
+  SYSBP = "Systolic Blood Pressure (mmHg)",
+  TOTCHOL = "Serum Total Cholesterol (mg/dL)"
+)
+# attr(data$SEX,'label')  <- 'Gender'
+# attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# attr(data$CVD,'label')  <- 'CVD Status'
+
+
+my_controls <- tableby.control(
+  test = T,
+  total = F,
+  numeric.test = "anova", cat.test = "chisq",
+  numeric.stats = c("meansd", "medianq1q3", "Nmiss2"),
+  cat.stats = c("countpct", "Nmiss2"),
+  stats.labels = list(
+    meansd = "Mean (SD)",
+    medianq1q3 = "Median (Q1, Q3)",
+    Nmiss2 = "Missing"
+  )
+)
+
+table <- arsenal::tableby(bll ~  age + gender + vapor, data = data, control = my_controls)
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Summary Statistic of Framingham Heart Study Longitudinal Data", 
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
+```
 
