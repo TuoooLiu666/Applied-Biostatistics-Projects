@@ -1,13 +1,15 @@
 ---
 title: "proj2"
 author: "Tuo Liu"
-date: "`r Sys.Date()`"
-output: pdf_document
+date: '`r Sys.Date()`'
+output:
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(survey, tidyverse, DataExplorer)
+pacman::p_load(survey, tidyverse, DataExplorer, arsenal, survey)
 ```
 
 
@@ -15,7 +17,6 @@ pacman::p_load(survey, tidyverse, DataExplorer)
 
 ```{r}
 data <- read.csv("./data/nhanes.csv")
-glimpse(data)
 ```
 - RIDAGEYR - Age in years at screening
 - WTINT2YR - Full sample 2 year interview weight
@@ -59,20 +60,47 @@ used to populate the table (i.e. every item listed in the shell table could be f
 with the provided output). All of this should be submitted in a single document.
 
 ```{r results="asis"}
+data <- data %>% select(1:4, 8:11, 16:17, 20, 24:26, 33) %>% filter(SMQ900 != 9)
+
+# data prep
+data <- data %>% mutate(
+            RIDRETH3=factor(RIDRETH3),
+            RIAGENDR=factor(RIAGENDR),
+            SMQ040=factor(SMQ040),
+            SMQ900=factor(SMQ900),
+            ALQ111=factor(ALQ111),
+            ALQ151=factor(ALQ151)
+            )
+
+levels(data$RIAGENDR) <- c("Male", "Female")
+levels(data$RIDRETH3) <- c("Mexican American","Other Hispanic", "Non-Hispanic White", "Non-Hispanic Black",
+                           "Non-Hispanic Asian", "Other")
+levels(data$SMQ040) <- c("Daily", "Sometimes","No")
+levels(data$SMQ900) <- c("Yes", "No")
+levels(data$ALQ111) <- c("Yes", "No")
+
+
+
+
+
+
 # variabel type
 DataExplorer::plot_missing(data)
-DataExplorer::plot_qq(data[,c("RIDAGEYR", "BMXBMI", "LBXBPB")])
+
+# drop na
+dat <- drop_na(data)
 
 # descriptive statistics for table 1
 my_labels <- list(
-  CVD = "CVD Status",
-  PERIOD = "Examination Cycle",
-  GLUCOSE = "Casual serum glucose (mg/dL)",
-  CURSMOKE = "Current Smoker",
-  CIGPDAY = "Cigarettes per day",
-  BMI = "BMI (kg/m2)",
-  SYSBP = "Systolic Blood Pressure (mmHg)",
-  TOTCHOL = "Serum Total Cholesterol (mg/dL)"
+  SMQ900 = "Ever used e-cigarette",
+  RIAGENDR = "Gender",
+  RIDAGEYR = "Age (yrs)",
+  RIDRETH3 = "Race/Ethnicity",
+  SMQ040 = "Current smoker",
+  SMQ720 = "Num. of cigarette/day",
+  LBXBPB = "Blood lead level (ug/dL)",
+  BMXBMI = "BMI (kg/m**2)",
+  ALQ111 = "Ever drink"
 )
 # attr(data$SEX,'label')  <- 'Gender'
 # attr(data$PERIOD,'label')  <- 'Examination Cycle'
@@ -83,23 +111,26 @@ my_controls <- tableby.control(
   test = T,
   total = F,
   numeric.test = "anova", cat.test = "chisq",
-  numeric.stats = c("meansd", "medianq1q3", "Nmiss2"),
-  cat.stats = c("countpct", "Nmiss2"),
+  numeric.stats = c("meansd", "medianq1q3"),
+  cat.stats = c("countpct"),
   stats.labels = list(
     meansd = "Mean (SD)",
-    medianq1q3 = "Median (Q1, Q3)",
-    Nmiss2 = "Missing"
+    medianq1q3 = "Median (Q1, Q3)"
   )
 )
 
-table <- arsenal::tableby(bll ~  age + gender + vapor, data = data, control = my_controls)
+table <- arsenal::tableby(SMQ900 ~  RIAGENDR + RIDAGEYR + RIDRETH3 + SMQ040 + SMQ720 + LBXBPB + BMXBMI + ALQ111, data = dat, control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
-  title = "Summary Statistic of Framingham Heart Study Longitudinal Data", 
+  title = "Summary Statistic of Subset of NHANES 2017-2018 Data", 
   pfootnote=TRUE,
   results="asis",
   digits=1
 )
+```
+### weighted descrptive statistics
+```{r}
+
 ```
 
