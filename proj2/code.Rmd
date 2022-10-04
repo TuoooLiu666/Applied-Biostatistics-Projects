@@ -17,7 +17,6 @@ pacman::p_load(survey, tidyverse, DataExplorer, arsenal, survey, gtsummary)
 
 ```{r}
 data <- read.csv("./data/nhanes.csv")
-colnames(data)
 ```
 - RIDAGEYR - Age in years at screening
 - WTINT2YR - Full sample 2 year interview weight
@@ -61,7 +60,7 @@ used to populate the table (i.e. every item listed in the shell table could be f
 with the provided output). All of this should be submitted in a single document.
 
 ```{r results="asis"}
-data <- data %>% select(1:4, 8:11, 16:17, 20, 24:26, 33:34) 
+# data <- data %>% select(1:4, 8:11, 16:17, 20, 24:26, 33:34) 
 
 # data prep
 data <- data %>% mutate(
@@ -129,28 +128,30 @@ summary(table,
 ```
 ### weighted descrptive statistics
 ```{r}
-design_s <- svydesign(id=data$SEQN, strata=data$SDMVSTRA, weights = data$WTINT2YR, data=data, nest=T)
-# subset design to get rid of NA
-design1 <- subset(design_s, SMQ900!="Don't know" & is.na(SMQ900)==F)
+data <- data %>% dplyr::mutate(SMQ900 = forcats::fct_explicit_na(factor(SMQ900)))
+design_s <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTINT2YR, data=data, nest=T)
 
 # age among vaping & non-vaping
-svyby(~RIDAGEYR, ~SMQ900, design1, svymean, na.rm = T)
+svyby(~RIDAGEYR, ~SMQ900, design_s, svymean, na.rm = T)
 
 # Num. of cigarette/day among vaping & non-vaping
-svyby(~SMQ720, ~SMQ900, design1, svymean, na.rm = T)
+svyby(~SMQ720, ~SMQ900, design_s, svymean, na.rm = T)
 
 # gender/race/tobacco use/alcohol use
-design1 %>%
-  tbl_svysummary(by = SMQ900, percent = "col", include = c(RIAGENDR, RIDRETH3,SMQ040,ALQ151))
+design_s %>%
+  tbl_svysummary(by = SMQ900, percent = "col", 
+                 include = c(RIAGENDR,RIDRETH3,SMQ040,ALQ151),
+                 statistic = list(all_categorical()~"{n_unweighted} ({p}%)"),
+                 missing = "no"
+                 )
 ```
 ```{r}
-design_m <- svydesign(id=data$SEQN, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
-# subset design to get rid of NA
-design2 <- subset(design_m, SMQ900!="Don't know" & is.na(SMQ900)==F)
+design_m <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
 
 # BMI among vaping & non-vaping
-svyby(~BMXBMI, ~SMQ900, design2, svymean, na.rm = T)
+svyby(~BMXBMI, ~SMQ900, design_m, svymean, na.rm = T)
 # Bood lead level among vaping & non-vaping
-svyby(~LBXBPB, ~SMQ900, design2, svymean, na.rm = T)
+svyby(~LBXBPB, ~SMQ900, design_m, svymean, na.rm = T)
+
 ```
 
