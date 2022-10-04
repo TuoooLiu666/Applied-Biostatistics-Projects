@@ -129,25 +129,23 @@ summary(table,
 ### weighted descrptive statistics
 ```{r}
 data <- data %>% dplyr::mutate(SMQ900 = forcats::fct_explicit_na(factor(SMQ900)))
-design_s <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTINT2YR, data=data, nest=T)
+design_m <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
 
 # age among vaping & non-vaping
-svyby(~RIDAGEYR, ~SMQ900, design_s, svymean, na.rm = T)
+svyby(~RIDAGEYR, ~SMQ900, design_m, svymean, na.rm = T)
 
 # Num. of cigarette/day among vaping & non-vaping
-svyby(~SMQ720, ~SMQ900, design_s, svymean, na.rm = T)
+svyby(~SMQ720, ~SMQ900, design_m, svymean, na.rm = T)
 
 # gender/race/tobacco use/alcohol use
-design_s %>%
+design_m %>%
   tbl_svysummary(by = SMQ900, percent = "col", 
                  include = c(RIAGENDR,RIDRETH3,SMQ040,ALQ151),
-                 statistic = list(all_categorical()~"{n_unweighted} ({p}%)"),
+                 statistic = list(all_categorical()~"{n_unweighted}/{N_unweighted} ({p_unweighted}%)"),
                  missing = "no"
                  )
 ```
 ```{r}
-design_m <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
-
 # BMI among vaping & non-vaping
 svyby(~BMXBMI, ~SMQ900, design_m, svymean, na.rm = T)
 # Bood lead level among vaping & non-vaping
