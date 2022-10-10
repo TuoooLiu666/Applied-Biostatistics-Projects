@@ -88,44 +88,45 @@ levels(data$ALQ151) <- c("Yes", "No", "Refused", "Don't know")
 DataExplorer::plot_missing(data)
 
 # descriptive statistics for table 1
-my_labels <- list(
-  SMQ900 = "Ever used e-cigarette",
-  RIAGENDR = "Gender",
-  RIDAGEYR = "Age (yrs)",
-  RIDRETH3 = "Race/Ethnicity",
-  SMQ040 = "Current smoker",
-  SMQ720 = "Num. of cigarette/day",
-  LBXBPB = "Blood lead level (ug/dL)",
-  BMXBMI = "BMI (kg/m2)",
-  ALQ111 = "Ever drink alcohol"
-)
-# attr(data$SEX,'label')  <- 'Gender'
-# attr(data$PERIOD,'label')  <- 'Examination Cycle'
-# attr(data$CVD,'label')  <- 'CVD Status'
-
-
-my_controls <- tableby.control(
-  test = T,
-  total = F,
-  numeric.test = "anova", cat.test = "chisq",
-  numeric.stats = c("meansd", "medianq1q3"),
-  cat.stats = c("countpct"),
-  stats.labels = list(
-    meansd = "Mean (SD)",
-    medianq1q3 = "Median (Q1, Q3)"
-  )
-)
-
-table <- arsenal::tableby(SMQ900 ~  RIAGENDR + RIDAGEYR + RIDRETH3 + SMQ040 + SMQ720 + LBXBPB + BMXBMI + ALQ111, data = data, control = my_controls)
-
-summary(table,
-  labelTranslations = my_labels,
-  title = "Summary Statistic of Subset of NHANES 2017-2018 Data", 
-  pfootnote=TRUE,
-  results="asis",
-  digits=1
-)
+# my_labels <- list(
+#   SMQ900 = "Ever used e-cigarette",
+#   RIAGENDR = "Gender",
+#   RIDAGEYR = "Age (yrs)",
+#   RIDRETH3 = "Race/Ethnicity",
+#   SMQ040 = "Current smoker",
+#   SMQ720 = "Num. of cigarette/day",
+#   LBXBPB = "Blood lead level (ug/dL)",
+#   BMXBMI = "BMI (kg/m2)",
+#   ALQ111 = "Ever drink alcohol"
+# )
+# # attr(data$SEX,'label')  <- 'Gender'
+# # attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# # attr(data$CVD,'label')  <- 'CVD Status'
+# 
+# 
+# my_controls <- tableby.control(
+#   test = T,
+#   total = F,
+#   numeric.test = "anova", cat.test = "chisq",
+#   numeric.stats = c("meansd", "medianq1q3"),
+#   cat.stats = c("countpct"),
+#   stats.labels = list(
+#     meansd = "Mean (SD)",
+#     medianq1q3 = "Median (Q1, Q3)"
+#   )
+# )
+# 
+# table <- arsenal::tableby(SMQ900 ~  RIAGENDR + RIDAGEYR + RIDRETH3 + SMQ040 + SMQ720 + LBXBPB + BMXBMI + ALQ111, data = data, control = my_controls)
+# 
+# summary(table,
+#   labelTranslations = my_labels,
+#   title = "Summary Statistic of Subset of NHANES 2017-2018 Data", 
+#   pfootnote=TRUE,
+#   results="asis",
+#   digits=1
+# )
 ```
+
 ### weighted descrptive statistics
 ```{r}
 data <- data %>% dplyr::mutate(SMQ900 = forcats::fct_explicit_na(factor(SMQ900)))
@@ -145,11 +146,24 @@ design_m %>%
                  missing = "no"
                  )
 ```
+
+
+
 ```{r}
 # BMI among vaping & non-vaping
 svyby(~BMXBMI, ~SMQ900, design_m, svymean, na.rm = T)
 # Bood lead level among vaping & non-vaping
 svyby(~LBXBPB, ~SMQ900, design_m, svymean, na.rm = T)
+```
+```{r}
+# LLOD for BLL
 
+
+
+```
+
+### vaping-only subpopulation
+```{r}
+desin_v <- subset(design_m, )
 ```
 
