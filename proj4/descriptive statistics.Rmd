@@ -7,6 +7,82 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
+pacman::p_load(tidyverse, DataExplorer, arsenal)
+```
+
+### study description
+#### 1.	brief discussion of the objectives of the project and the sample
+
+Objective: to investigate the association between smoking cessation and weight gain.   
+The sample is relative large (N=1629), including information from interviews, examinations. 63 subjects were excluded due to missing value of weight difference between 1971 and 1982, and extra 41 subjects were removed because of weight loss medication. Table 1 presented a summary of the rest of samples (N=1525) by stratification on weight gain status (Yes/No). 
+
+#### 2. identify and define outcomes, the exposure or treatment and important predictors
+
+The major predictor was defined as number of days used an e-cigarette (use vaping and e-cigarette interchangeably) during the past 30 days. Usage of e-cigarette=1 if subject ever used or is now using e-cigarette. Usage of e-cigarette=o, otherwise. Other important predictors included subjects’ gender, age, race/ethnicity, BMI, alcohol consumption.  
+
+The outcome variable was blood lead level. Special care should be paid to observations with lower limit of detection (LLOD) levels. Imputation method was selected accordingly to the percentage of LLOD (0.07 ug/dL) observations. 
+
+### data read-in
+```{r}
+data <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
+colnames(data)
+```
+
+
+### descriptive statistics
+```{r results='asis'}
+# create weight gain status variable
+data$wtgain <- ifelse(data$wt82_71>0, "Yes", "No")
+
+# data prep
+data <- data %>% mutate(
+            qsmk=factor(qsmk),
+            sex=factor(sex),
+            race=factor(race),
+            education=factor(education)
+            )
+
+levels(data$qsmk) <- c("No", "Yes")
+levels(data$sex) <- c("Male", "Female")
+levels(data$race) <- c("White", "Other")
+levels(data$education) <- c("8th grade or less", "High school DROPOUT", "High school","College dropout", "College or more")
+
+
+# descriptive statistics for table 1
+my_labels <- list(
+  qsmk = "Quit smoking between 1971 and 1982",
+  wtgain = "Gained weight from 1971",
+  sex = "Gender",
+  age = "Age (yrs) in 1971",
+  race = "Race",
+  education = "Education by 1971",
+  smkintensity82_71 = "Increase in number of cigarettes/day from 1971 to 1982",
+  smokeyrs = "YEARS OF SMOKING"
+)
+# # attr(data$SEX,'label')  <- 'Gender'
+# # attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# # attr(data$CVD,'label')  <- 'CVD Status'
+# 
+# 
+my_controls <- tableby.control(
+  test = F,
+  total = F,
+  #numeric.test = "anova", cat.test = "chisq",
+  numeric.stats = c("meansd"),
+  cat.stats = c("countpct"),
+  stats.labels = list(
+    meansd = "Mean (SD)"
+  )
+)
+
+table <- arsenal::tableby(wtgain ~  sex + age + race + education + qsmk + smokeyrs + smkintensity82_71, data = data, control = my_controls)
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Summary Statistics of NHEFS 1971-1982 Data",
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
 ```
 
