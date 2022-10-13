@@ -17,13 +17,16 @@ pacman::p_load(survey, tidyverse, DataExplorer, arsenal, survey, gtsummary)
 
 ```{r}
 data <- read.csv("./data/nhanes.csv")
+colnames(data)
 ```
 - RIDAGEYR - Age in years at screening
 - WTINT2YR - Full sample 2 year interview weight
 - WTMEC2YR - Full sample 2 year MEC exam weight
 - SDMVPSU - Masked variance pseudo-PSU
 - SDMVSTRA - Masked variance pseudo-stratum
-
+- dmdeduc2 - Education level
+- dmdmartL - Marital status
+- indhhin2 - household income
 
 - SMQ020 - Smoked at least 100 cigarettes in life
 - SMQ040 - Do you now smoke cigarettes?
@@ -60,110 +63,123 @@ used to populate the table (i.e. every item listed in the shell table could be f
 with the provided output). All of this should be submitted in a single document.
 
 ```{r results="asis"}
-# data <- data %>% select(1:4, 8:11, 16:17, 20, 24:26, 33:34) 
+# feature engineering
+data$merit <- ifelse(data$DMDMARTL %in% c(1,6), 1, ifelse(data$DMDMARTL %in% c(2:5), 2, 9))
+data$educ <- ifelse(data$DMDEDUC2 %in% c(1,2), 1, ifelse(data$DMDEDUC2 %in% c(3),2,ifelse(data$DMDEDUC2 ==4,3,ifelse(data$DMDEDUC2 == 5,4,5))))
+data$inc <- ifelse(data$INDHHIN2 %in% c(1,2,3,4,5), 1, ifelse(data$INDHHIN2 %in% c(6,7), 2, ifelse(data$INDHHIN2 %in% c(8:10),3, ifelse(data$INDHHIN2 %in% c(14:15), 4, 5))))
+data$alc <- ifelse(data$ALQ121 == 0, 0, ifelse(data$ALQ121 %in% c(1,2,3,4), 1, 2))
+data$ecig <- ifelse(data$SMQ905 %in% c(1:30)|data$SMQ849 %in% c(1,2,3,4,5), 1, 0)
+
 
 # data prep
 data <- data %>% mutate(
             RIDRETH3=factor(RIDRETH3),
             RIAGENDR=factor(RIAGENDR),
             SMQ040=factor(SMQ040),
-            SMQ900=factor(SMQ900),
-            ALQ111=factor(ALQ111),
-            ALQ151=factor(ALQ151)
+            SMQ905=factor(SMQ905),
+            SMQ849=factor(SMQ849),
+            ALQ121=factor(ALQ121),
+            educ=factor(educ),
+            merit=factor(merit),
+            inc=factor(inc),
+            alc=factor(alc),
+            ecig=factor(ecig)
             )
 
 levels(data$RIAGENDR) <- c("Male", "Female")
-levels(data$RIDRETH3) <- c("Mexican American","Other Hispanic", "Non-Hispanic White", "Non-Hispanic Black",
-                           "Non-Hispanic Asian", "Other")
-levels(data$SMQ040) <- c("Daily", "Sometimes","No")
-levels(data$SMQ900) <- c("Yes", "No", "Don't know")
-levels(data$ALQ111) <- c("Yes", "No")
-levels(data$ALQ151) <- c("Yes", "No", "Refused", "Don't know")
+levels(data$RIDRETH3) <- c("Mexican American","Other Hispanic", "Non-Hispanic White", "Non-Hispanic Black","Non-Hispanic Asian", "Other Race")
+levels(data$educ) <- c("No High School Diploma", "High School Diploma", "Some College", "College Graduates", "Unknown")
+levels(data$inc) <- c("Under 25k", "25k-45k", "45k-75k", "Above 75k", "Unknown")
+levels(data$merit) <- c("Married","Single","Unknown")
+levels(data$alc) <- c("Drinker", "Non-Drinker", "Unknown")
+levels(data$ecig) <- c("Non-Smoker", "Smoker")
 
 
 
-
-
-# variabel type
+# missing
 DataExplorer::plot_missing(data)
-
-# descriptive statistics for table 1
-# my_labels <- list(
-#   SMQ900 = "Ever used e-cigarette",
-#   RIAGENDR = "Gender",
-#   RIDAGEYR = "Age (yrs)",
-#   RIDRETH3 = "Race/Ethnicity",
-#   SMQ040 = "Current smoker",
-#   SMQ720 = "Num. of cigarette/day",
-#   LBXBPB = "Blood lead level (ug/dL)",
-#   BMXBMI = "BMI (kg/m2)",
-#   ALQ111 = "Ever drink alcohol"
-# )
-# # attr(data$SEX,'label')  <- 'Gender'
-# # attr(data$PERIOD,'label')  <- 'Examination Cycle'
-# # attr(data$CVD,'label')  <- 'CVD Status'
-# 
-# 
-# my_controls <- tableby.control(
-#   test = T,
-#   total = F,
-#   numeric.test = "anova", cat.test = "chisq",
-#   numeric.stats = c("meansd", "medianq1q3"),
-#   cat.stats = c("countpct"),
-#   stats.labels = list(
-#     meansd = "Mean (SD)",
-#     medianq1q3 = "Median (Q1, Q3)"
-#   )
-# )
-# 
-# table <- arsenal::tableby(SMQ900 ~  RIAGENDR + RIDAGEYR + RIDRETH3 + SMQ040 + SMQ720 + LBXBPB + BMXBMI + ALQ111, data = data, control = my_controls)
-# 
-# summary(table,
-#   labelTranslations = my_labels,
-#   title = "Summary Statistic of Subset of NHANES 2017-2018 Data", 
-#   pfootnote=TRUE,
-#   results="asis",
-#   digits=1
-# )
 ```
 
+
+
 ### weighted descrptive statistics
-```{r}
-data <- data %>% dplyr::mutate(SMQ900 = forcats::fct_explicit_na(factor(SMQ900)))
-design_m <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
+```{r results='asis'}
+design <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA,  weights = data$WTMEC2YR, data=data, nest=T)
 
-# age among vaping & non-vaping
-svyby(~RIDAGEYR, ~SMQ900, design_m, svymean, na.rm = T)
+# subset desing to include subject >= 18
+design_m <- subset(design, RIDAGEYR > 17)
 
-# Num. of cigarette/day among vaping & non-vaping
-svyby(~SMQ720, ~SMQ900, design_m, svymean, na.rm = T)
+
+# # age among vaping & non-vaping
+# svyby(~RIDAGEYR, ~ecig, design_m, svymean, na.rm = T)
+# 
+# # BMI among vaping & non-vaping
+# svyby(~BMXBMI, ~ecig, design_m, svymean, na.rm = T)
+# 
+# # Bood lead level among vaping & non-vaping
+# svyby(~LBXBPB, ~ecig, design_m, svymean, na.rm = T)
+# 
+# # Num. of cigarette/day among vaping & non-vaping
+# svyby(~SMQ720, ~ecig, design_m, svymean, na.rm = T)
 
 # gender/race/tobacco use/alcohol use
 design_m %>%
-  tbl_svysummary(by = SMQ900, percent = "col", 
-                 include = c(RIAGENDR,RIDRETH3,SMQ040,ALQ151),
-                 statistic = list(all_categorical()~"{n_unweighted}/{N_unweighted} ({p_unweighted}%)"),
-                 missing = "no"
+  tbl_svysummary(by = ecig, percent = "col", 
+                 include = c(RIAGENDR,RIDAGEYR,RIDRETH3,merit,inc ,LBXBPB,BMXBMI),
+                 statistic = list(all_categorical()~"{n_unweighted}/{N_unweighted} ({p_unweighted}%)",
+                                  all_continuous() ~ "{mean} ({mean.std.error})"),
+                 label = list(RIAGENDR ~ "Gender",
+                              RIDAGEYR ~ "Age (yrs)",
+                              RIDRETH3 ~ "Race/Ethnicity",
+                              merit ~ "Marital Status",
+                              inc ~ "Household Income Level",
+                              LBXBPB ~ "Blood Lead Level (ug/dL)",
+                              BMXBMI ~ "BMI"),
+                 
+                 missing = "no",
+                 digits = list(RIDAGEYR ~ c(1, 1),
+                               LBXBPB ~ c(1, 1),
+                               BMXBMI ~ c(1,1)),
+                 
                  )
-```
-
-
-
-```{r}
-# BMI among vaping & non-vaping
-svyby(~BMXBMI, ~SMQ900, design_m, svymean, na.rm = T)
-# Bood lead level among vaping & non-vaping
-svyby(~LBXBPB, ~SMQ900, design_m, svymean, na.rm = T)
-```
-```{r}
-# LLOD for BLL
-
-
 
 ```
+
+
+
+
+### models
+```{r results='asis'}
+# unadjusted
+model_unadjusted <- svyglm(LBXBPB~ecig, design = design_m)
+sum_a <- model_unadjusted %>% tbl_regression()
+
+
+# adjusted
+model_adjusted <- svyglm(LBXBPB~ecig + RIAGENDR + RIDAGEYR, design = design_m)
+sum_b <- model_adjusted %>%  tbl_regression()
+
+
+# interaction
+model_sex <- svyglm(LBXBPB~ecig*RIAGENDR, design = design_m)
+sum_c <- model_sex %>%  tbl_regression()
+
+model_age <- svyglm(LBXBPB~ecig*RIDAGEYR, design = design_m)
+sum_d <- model_age %>%  tbl_regression()
+
+
+# summary
+tbl_merge_sum <-
+  tbl_stack(
+    tbls = list(sum_a, sum_b, sum_c, sum_d),
+    group_header = c("Unadjusted Analysis", "Adjusted Analysis", "Interaction-Gender", "Interaction-Age")
+  )
+tbl_merge_sum
+```
+
 
 ### vaping-only subpopulation
 ```{r}
-desin_v <- subset(design_m, )
+# design_v <- subset(design_m, )
 ```
 
