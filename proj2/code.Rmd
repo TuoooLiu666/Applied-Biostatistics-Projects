@@ -17,7 +17,8 @@ pacman::p_load(survey, tidyverse, DataExplorer, arsenal, survey, gtsummary)
 
 ```{r}
 data <- read.csv("./data/nhanes.csv")
-colnames(data)
+# missing
+DataExplorer::plot_missing(data)
 ```
 - RIDAGEYR - Age in years at screening
 - WTINT2YR - Full sample 2 year interview weight
@@ -63,12 +64,19 @@ used to populate the table (i.e. every item listed in the shell table could be f
 with the provided output). All of this should be submitted in a single document.
 
 ```{r results="asis"}
+# sum(is.na(data$DMDEDUC2))
+# sum(is.na(data$DMDMARTL))
+# sum(is.na(data$INDHHIN2))
+# sum(is.na(data$ALQ121))
+# sum(is.na(data$SMQ905))
+
 # feature engineering
-data$merit <- ifelse(data$DMDMARTL %in% c(1,6), 1, ifelse(data$DMDMARTL %in% c(2:5), 2, 9))
-data$educ <- ifelse(data$DMDEDUC2 %in% c(1,2), 1, ifelse(data$DMDEDUC2 %in% c(3),2,ifelse(data$DMDEDUC2 ==4,3,ifelse(data$DMDEDUC2 == 5,4,5))))
-data$inc <- ifelse(data$INDHHIN2 %in% c(1,2,3,4,5), 1, ifelse(data$INDHHIN2 %in% c(6,7), 2, ifelse(data$INDHHIN2 %in% c(8:10),3, ifelse(data$INDHHIN2 %in% c(14:15), 4, 5))))
-data$alc <- ifelse(data$ALQ121 == 0, 0, ifelse(data$ALQ121 %in% c(1,2,3,4), 1, 2))
-data$ecig <- ifelse(data$SMQ905 %in% c(1:30)|data$SMQ849 %in% c(1,2,3,4,5), 1, 0)
+data$merit <- ifelse(data$DMDMARTL %in% c(1,6), 1, ifelse(data$DMDMARTL %in% c(2:5), 2, ifelse(data$DMDMARTL==77, 9, NA)))
+data$educ <- ifelse(data$DMDEDUC2 %in% c(1,2)&data$RIDAGEYR>=20|data$DMDEDUC3 %in% c(8,9,10,11,12)&data$RIDAGEYR<20, 1, ifelse(data$DMDEDUC2&data$RIDAGEYR>=20 %in% c(3)|data$DMDEDUC3 %in% c(13,14)&data$RIDAGEYR<20,2,ifelse(data$DMDEDUC2 ==4&data$RIDAGEYR>=20|data$DMDEDUC3==15&data$RIDAGEYR<20,3,ifelse(data$DMDEDUC2 == 5 &data$RIDAGEYR>=20,4,5))))
+data$inc <- ifelse(data$INDHHIN2 %in% c(1,2,3,4,5), 1, ifelse(data$INDHHIN2 %in% c(6,7), 2, ifelse(data$INDHHIN2 %in% c(8:10),3, ifelse(data$INDHHIN2 %in% c(14:15), 4, ifelse(data$INDHHIN2 %in% c(77,99, 12,13),9,NA)))))
+data$alc <- ifelse(data$ALQ121 == 0, 0, ifelse(data$ALQ121 %in% c(1,2,3,4,5), 1, ifelse(data$ALQ121 %in% c(6:10), 2, ifelse(data$ALQ121 %in% c(77,99), 9, NA))))
+
+data$ecig <- ifelse(data$SMQ905 %in% c(1:30), 1, ifelse(data$SMQ905==0, 0, ifelse(data$SMQ905==99, 9, NA)))
 
 
 # data prep
@@ -76,7 +84,6 @@ data <- data %>% mutate(
             RIDRETH3=factor(RIDRETH3),
             RIAGENDR=factor(RIAGENDR),
             SMQ040=factor(SMQ040),
-            SMQ905=factor(SMQ905),
             SMQ849=factor(SMQ849),
             ALQ121=factor(ALQ121),
             educ=factor(educ),
@@ -91,23 +98,26 @@ levels(data$RIDRETH3) <- c("Mexican American","Other Hispanic", "Non-Hispanic Wh
 levels(data$educ) <- c("No High School Diploma", "High School Diploma", "Some College", "College Graduates", "Unknown")
 levels(data$inc) <- c("Under 25k", "25k-45k", "45k-75k", "Above 75k", "Unknown")
 levels(data$merit) <- c("Married","Single","Unknown")
-levels(data$alc) <- c("Drinker", "Non-Drinker", "Unknown")
-levels(data$ecig) <- c("Non-Smoker", "Smoker")
+levels(data$alc) <- c("Non-Drinker", "Drinking 2/week or more","Occasional drinkers","Unknown")
+levels(data$ecig) <- c("Non-Smoker", "Smoker", "Unkown")
 
-
-
-# missing
-DataExplorer::plot_missing(data)
+# sum(is.na(data$merit))
+# sum(is.na(data$educ))
+# sum(is.na(data$inc))
+# sum(is.na(data$alc))
+# sum(is.na(data$ecig))
 ```
-
 
 
 ### weighted descrptive statistics
 ```{r results='asis'}
-design <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA,  weights = data$WTMEC2YR, data=data, nest=T)
+design <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
 
 # subset desing to include subject >= 18
-design_m <- subset(design, RIDAGEYR > 17)
+filter <- (!is.na(data$SMQ905))
+
+
+design_m <- subset(design, filter & SEQN!=99240)
 
 
 # # age among vaping & non-vaping
@@ -125,7 +135,7 @@ design_m <- subset(design, RIDAGEYR > 17)
 # gender/race/tobacco use/alcohol use
 design_m %>%
   tbl_svysummary(by = ecig, percent = "col", 
-                 include = c(RIAGENDR,RIDAGEYR,RIDRETH3,merit,inc ,LBXBPB,BMXBMI),
+                 include = c(RIAGENDR,RIDAGEYR,RIDRETH3,merit,inc ,alc, LBXBPB,BMXBMI),
                  statistic = list(all_categorical()~"{n_unweighted}/{N_unweighted} ({p_unweighted}%)",
                                   all_continuous() ~ "{mean} ({mean.std.error})"),
                  label = list(RIAGENDR ~ "Gender",
@@ -151,20 +161,20 @@ design_m %>%
 ### models
 ```{r results='asis'}
 # unadjusted
-model_unadjusted <- svyglm(LBXBPB~ecig, design = design_m)
+model_unadjusted <- svyglm(LBXBPB~SMQ905, design = design_m)
 sum_a <- model_unadjusted %>% tbl_regression()
 
 
 # adjusted
-model_adjusted <- svyglm(LBXBPB~ecig + RIAGENDR + RIDAGEYR, design = design_m)
+model_adjusted <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR, design = design_m)
 sum_b <- model_adjusted %>%  tbl_regression()
 
 
 # interaction
-model_sex <- svyglm(LBXBPB~ecig*RIAGENDR, design = design_m)
+model_sex <- svyglm(LBXBPB~SMQ905*RIAGENDR, design = design_m)
 sum_c <- model_sex %>%  tbl_regression()
 
-model_age <- svyglm(LBXBPB~ecig*RIDAGEYR, design = design_m)
+model_age <- svyglm(LBXBPB~SMQ905*RIDAGEYR, design = design_m)
 sum_d <- model_age %>%  tbl_regression()
 
 
@@ -176,7 +186,6 @@ tbl_merge_sum <-
   )
 tbl_merge_sum
 ```
-
 
 ### vaping-only subpopulation
 ```{r}
