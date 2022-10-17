@@ -145,8 +145,8 @@ design_m %>%
                               inc ~ "Household Income Level",
                               LBXBPB ~ "Blood Lead Level (ug/dL)",
                               BMXBMI ~ "BMI"),
-                 
-                 missing = "no",
+                 missing_text = "Missing",
+                 #missing = "no",
                  digits = list(RIDAGEYR ~ c(1, 1),
                                LBXBPB ~ c(1, 1),
                                BMXBMI ~ c(1,1)),
