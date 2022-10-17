@@ -86,3 +86,52 @@ summary(table,
 )
 ```
 
+
+## descriptive statistic_Yujung
+```{r}
+table(data$qsmk)
+n_miss(data$qsmk)
+
+data$status <- as.factor(ifelse(data$qsmk == 0 & data$smokeintensity <=10, 'noqui-light',
+                                ifelse(data$qsmk == 0 & data$smokeintensity <20, 'noqui-moderate',
+                                       ifelse(data$qsmk == 0 & data$smokeintensity >= 20, 'noqui-heavy',
+                                              ifelse(data$qsmk ==1 & data$smokeintensity <=10, 'qui-light',
+                                                     ifelse(data$qsmk == 1 & data$smokeintensity <20, 'qui-moderate',
+                                                            ifelse(data$qsmk == 1 & data$smokeintensity >=20, 'qui-heavy', 'other')))))))
+
+
+data$chol_status <- as.factor(ifelse(data$cholesterol <200, 'Less than 200 mg/dL', 'At or above 200 mg/dL'))
+
+data$sex <- as.factor(data$sex)
+levels(data$sex) <- c("Male", "Female")
+data$hbp <- as.factor(data$hbp)
+levels(data$hbp) <- c("No", "Yes", "Missing" )
+data$diabetes <- as.factor(data$diabetes)
+levels(data$diabetes) <- c("No", "Yes", "Missing" )
+data$wtloss <- as.factor(data$wtloss)
+levels(data$wtloss) <- c("No", "Yes")
+
+
+
+table(data$status)
+n_miss(data$status)
+
+# Create table
+controls <- tableby.control( test = TRUE, total = TRUE,
+                             numeric.test="kwt", cat.test="chisq",
+                             numeric.stats = c("N", "meansd", "Nmiss"),
+                             cat.stats = c("countpct" , "Nmiss"),
+                             stats.labels=list(N='Count', Nmiss='Missing'))
+
+Mylabels <- list(chol_status = "Cholesterol level", wt82_71 = "Weight change", age = "Age", sex = "Gender", hbp = "Dx Hight blood pressure", diabetes = "Dx Diabetes", wtloss = "Used weight loss medication" )
+
+table2 <- tableby(status ~ wt82_71 + age + sex + chol_status + hbp + diabetes + wtloss, data = data, control = controls )
+
+
+```
+
+```{r results = "asis"}
+summary(table2, text=TRUE, labelTranslations = Mylabels)
+```
+
+
