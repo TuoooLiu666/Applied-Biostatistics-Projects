@@ -64,12 +64,6 @@ used to populate the table (i.e. every item listed in the shell table could be f
 with the provided output). All of this should be submitted in a single document.
 
 ```{r results="asis"}
-# sum(is.na(data$DMDEDUC2))
-# sum(is.na(data$DMDMARTL))
-# sum(is.na(data$INDHHIN2))
-# sum(is.na(data$ALQ121))
-# sum(is.na(data$SMQ905))
-
 # feature engineering
 data$merit <- ifelse(data$DMDMARTL %in% c(1,6), 1, ifelse(data$DMDMARTL %in% c(2:5), 2, ifelse(data$DMDMARTL==77, 9, NA)))
 data$educ <- ifelse(data$DMDEDUC2 %in% c(1,2)&data$RIDAGEYR>=20|data$DMDEDUC3 %in% c(8,9,10,11,12)&data$RIDAGEYR<20, 1, ifelse(data$DMDEDUC2&data$RIDAGEYR>=20 %in% c(3)|data$DMDEDUC3 %in% c(13,14)&data$RIDAGEYR<20,2,ifelse(data$DMDEDUC2 ==4&data$RIDAGEYR>=20|data$DMDEDUC3==15&data$RIDAGEYR<20,3,ifelse(data$DMDEDUC2 == 5 &data$RIDAGEYR>=20,4,5))))
@@ -77,8 +71,10 @@ data$inc <- ifelse(data$INDHHIN2 %in% c(1,2,3,4,5), 1, ifelse(data$INDHHIN2 %in%
 data$alc <- ifelse(data$ALQ121 == 0, 0, ifelse(data$ALQ121 %in% c(1,2,3,4,5), 1, ifelse(data$ALQ121 %in% c(6:10), 2, ifelse(data$ALQ121 %in% c(77,99), 9, NA))))
 
 data$ecig <- ifelse(data$SMQ905 %in% c(1:30), 1, ifelse(data$SMQ905==0, 0, ifelse(data$SMQ905==99, 9, NA)))
-
-
+data$age <- ifelse(data$RIDAGEYR<19, 1, ifelse(data$RIDAGEYR<35, 2, ifelse(data$RIDAGEYR<65, 3, 4)))
+data$tobacco <- ifelse(data$SMQ720 %in% c(0:5), "light", ifelse(data$SMQ720 %in% c(6:10), "moderate", ifelse(data$SMQ720 %in% c(11:40), "heavy", NA)))
+  
+  
 # data prep
 data <- data %>% mutate(
             RIDRETH3=factor(RIDRETH3),
@@ -90,7 +86,8 @@ data <- data %>% mutate(
             merit=factor(merit),
             inc=factor(inc),
             alc=factor(alc),
-            ecig=factor(ecig)
+            ecig=factor(ecig),
+            age=factor(age)
             )
 
 levels(data$RIAGENDR) <- c("Male", "Female")
@@ -100,12 +97,7 @@ levels(data$inc) <- c("Under 25k", "25k-45k", "45k-75k", "Above 75k", "Unknown")
 levels(data$merit) <- c("Married","Single","Unknown")
 levels(data$alc) <- c("Non-Drinker", "Drinking 2/week or more","Occasional drinkers","Unknown")
 levels(data$ecig) <- c("Non-Smoker", "Smoker", "Unkown")
-
-# sum(is.na(data$merit))
-# sum(is.na(data$educ))
-# sum(is.na(data$inc))
-# sum(is.na(data$alc))
-# sum(is.na(data$ecig))
+# levels(data$age) <- c(1,2,3,4)
 ```
 
 
@@ -113,24 +105,12 @@ levels(data$ecig) <- c("Non-Smoker", "Smoker", "Unkown")
 ```{r results='asis'}
 design <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2YR, data=data, nest=T)
 
-# subset desing to include subject >= 18
-filter <- (!is.na(data$SMQ905))
+# subset design to exclude NA in predictor and outcome
+filter <- (!is.na(data$SMQ905) & !is.na(data$LBXBPB))
 
 
 design_m <- subset(design, filter & SEQN!=99240)
 
-
-# # age among vaping & non-vaping
-# svyby(~RIDAGEYR, ~ecig, design_m, svymean, na.rm = T)
-# 
-# # BMI among vaping & non-vaping
-# svyby(~BMXBMI, ~ecig, design_m, svymean, na.rm = T)
-# 
-# # Bood lead level among vaping & non-vaping
-# svyby(~LBXBPB, ~ecig, design_m, svymean, na.rm = T)
-# 
-# # Num. of cigarette/day among vaping & non-vaping
-# svyby(~SMQ720, ~ecig, design_m, svymean, na.rm = T)
 
 # gender/race/tobacco use/alcohol use
 design_m %>%
@@ -146,7 +126,7 @@ design_m %>%
                               LBXBPB ~ "Blood Lead Level (ug/dL)",
                               BMXBMI ~ "BMI"),
                  missing_text = "Missing",
-                 #missing = "no",
+                 missing = "no",
                  digits = list(RIDAGEYR ~ c(1, 1),
                                LBXBPB ~ c(1, 1),
                                BMXBMI ~ c(1,1)),
@@ -166,13 +146,14 @@ sum_a <- model_unadjusted %>% tbl_regression()
 
 
 # adjusted
-model_adjusted <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR, design = design_m)
+model_adjusted <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR+ BMXBMI + educ + inc + alc + merit, design = design_m)
 sum_b <- model_adjusted %>%  tbl_regression()
 
 
 # interaction
 model_sex <- svyglm(LBXBPB~SMQ905*RIAGENDR, design = design_m)
 sum_c <- model_sex %>%  tbl_regression()
+
 
 model_age <- svyglm(LBXBPB~SMQ905*RIDAGEYR, design = design_m)
 sum_d <- model_age %>%  tbl_regression()
@@ -187,8 +168,40 @@ tbl_merge_sum <-
 tbl_merge_sum
 ```
 
-### vaping-only subpopulation
+
+
+
+### stratified analysis by tobacco use
 ```{r}
-# design_v <- subset(design_m, )
+# light tobacco smoker
+design_l <- subset(design_m, tobacco=="light")
+model_l <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR + BMXBMI + inc, design = design_l)
+sum_l <- model_l %>% tbl_regression()
+
+design_m1 <- subset(design_m, tobacco=="moderate")
+model_m1 <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR + BMXBMI + inc, design = design_m1)
+sum_m1 <- model_m1 %>% tbl_regression()
+
+design_h <- subset(design_m, tobacco=="heavy")
+model_h <- svyglm(LBXBPB~SMQ905 + RIAGENDR + RIDAGEYR + BMXBMI + inc, design = design_h)
+sum_h <- model_h %>% tbl_regression()
+
+
+
+# summary
+tbl_merge_sum_1 <-
+  tbl_stack(
+    tbls = list(sum_l, sum_m1, sum_h),
+    group_header = c("Light Tobacco User", "Moderate Tobacco User", "Heavy Tobacco User")
+  )
+tbl_merge_sum_1
 ```
 
+
+### sensitivity analysis using age groups
+```{r}
+# sensitivity analysis
+model_sen <- svyglm(LBXBPB~SMQ905 + RIAGENDR + age + BMXBMI + inc, design = design_m)
+sum_i <- model_sen %>%  tbl_regression()
+sum_i
+```
