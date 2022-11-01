@@ -18,9 +18,9 @@ The sample is relative large (N=1629), including information from interviews, ex
 
 #### 2. identify and define outcomes, the exposure or treatment and important predictors
 
-The major predictor was defined as number of days used an e-cigarette (use vaping and e-cigarette interchangeably) during the past 30 days. Usage of e-cigarette=1 if subject ever used or is now using e-cigarette. Usage of e-cigarette=o, otherwise. Other important predictors included subjects’ gender, age, race/ethnicity, BMI, alcohol consumption.  
+The major predictor was smoking cessation (1 if subject quitted smoking during study, 0 otherwise). Other important predictors included subjects’ gender, age, race/ethnicity, BMI, alcohol consumption.  
 
-The outcome variable was blood lead level. Special care should be paid to observations with lower limit of detection (LLOD) levels. Imputation method was selected accordingly to the percentage of LLOD (0.07 ug/dL) observations. 
+The outcome variable was subjects' body weight. 
 
 ### data read-in
 ```{r}
@@ -87,10 +87,10 @@ summary(table,
 ```
 
 
-## descriptive statistic_Yujung
+### descriptive statistic_Yujung
 ```{r}
-table(data$qsmk)
-n_miss(data$qsmk)
+# table(data$qsmk)
+# n_miss(data$qsmk)
 
 data$status <- as.factor(ifelse(data$qsmk == 0 & data$smokeintensity <=10, 'noqui-light',
                                 ifelse(data$qsmk == 0 & data$smokeintensity <20, 'noqui-moderate',
@@ -113,8 +113,8 @@ levels(data$wtloss) <- c("No", "Yes")
 
 
 
-table(data$status)
-n_miss(data$status)
+# table(data$status)
+# n_miss(data$status)
 
 # Create table
 controls <- tableby.control( test = TRUE, total = TRUE,
@@ -135,3 +135,88 @@ summary(table2, text=TRUE, labelTranslations = Mylabels)
 ```
 
 
+### Propensity Score 
+1. Definition:
+- A propensity score is a single score that represents the probability of receiving a treatment, conditional on a set of observed covariates.  
+
+2. Objective
+- The goal of creating a propensity score is to balance covariates between individuals who did and did not receive a treatment, making it easier to isolate the effect of a treatment.
+
+- Propensity scores are used to reduce confounding and thus include variables thought to be related to both treatment and outcome. 
+
+3. Use case
+- Propensity scores are useful when estimating a treatment’s effect on an outcome using observational data and when selection bias due to nonrandom treatment assignment is likely.
+
+- RCT:  control individuals that are similar to treated individuals in everything but treatment receipt are used as proxies for the counterfactual.
+
+- In observational data, however, treatment assignment is not random. This leads to selection bias, where measured and unmeasured characteristics of individuals are associated with likelihood
+of receiving treatment and with the outcome. 
+
+4. Example
+- We used propensity scores to account for the fact that patients’ baseline health affects both probability of receiving palliative care and experiencing adverse health outcomes.(see example in help file)
+
+- if one were concerned that age might affect both treatment selection and outcome, one strategy would be to compare individuals of similar age in both treatment and comparison groups.
+
+- But it's unlikely to find individuals with identical age, gender, race, insurrance status, etc from treatmetn and control group.
+
+- Compress these factors into one single score
+
+5. STEPS INVOLVED IN CONSTRUCTING AND ASSESSING PROPENSITY SCORES
+- Step One: Choice of Variables to Include in the Propensity Score
+  - Guidance: controlling for covariates associated with the outcome
+  - If a variable is thought to be related to the __outcome__ but not the treatment, including it in the propensity score should reduce bias.
+    - With sufficiently large datasets, it is beneficial to include all variables that are potentially related to the outcome.
+    - In smaller datasets, however, potentially irrelevant covariates may introduce too much “noise” into treatment effect estimates
+  - Controlling for variables that are hypothesized to be associated with _treatment_ but _not outcome_, however, can __decrease precision__.
+  
+  
+- Step Two: Balance of Propensity Score across Treatment and Comparison Groups
+  
+  
+  
+  
+- Step Three: Balance of Covariates across Treatment and Comparison Groups within Blocks of the Propensity Score
+  
+  
+- Step Four: Choice of Matching and Weighting Strategies
+
+
+- Step Five: Balance of Covariates after Matching or Weighting the Sample by a Propensity Score
+  
+  
+  
+### Example: [the effect of going to Catholic school, as opposed to public school, on student achievement](https://sejdemyr.github.io/r-tutorials/statistics/tutorial8.html)
+
+Follow these steps:
+1. Preliminary analysis
+Before propensity scores are calculated, it is a good  practice to determine if the two groups are balanced.
+
+2. Estimation of Propensity scores
+
+
+3. Propensity Score matching
+4. Outcome analysis 
+5. Sensitivity analysis 
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
