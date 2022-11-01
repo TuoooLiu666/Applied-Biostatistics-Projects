@@ -101,7 +101,7 @@ data$tobacco <- ifelse(data$SMQ720 %in% c(1:5), 1,
                                      ifelse(data$SMQ720==95, 9, NA))))
 
 data$age_65 <- ifelse(data$RIDAGEYR >= 65, 1, 0)
-
+data$lgbll <- log(data$LBXBPB)
 # data prep
 data <- data %>% mutate(
             RIDRETH3=factor(RIDRETH3),
@@ -141,14 +141,13 @@ design <- svydesign(id=data$SDMVPSU, strata=data$SDMVSTRA, weights = data$WTMEC2
 # subset design to exclude NA in predictor and outcome
 filter <- (!is.na(data$SMQ905) & !is.na(data$LBXBPB))
 
-
 design_m <- subset(design, filter & SEQN!=99240)
-svyhist(~RIDAGEYR, design=design_m, na.rm=F)
+
 
 # gender/race/tobacco use/alcohol use
 design_m %>%
   tbl_svysummary(by = ecig, percent = "col", 
-                 include = c(RIAGENDR,RIDAGEYR,RIDRETH3,merit,inc ,alc, LBXBPB,BMXBMI),
+                 include = c(RIAGENDR,RIDAGEYR,RIDRETH3,merit,inc ,educ,alc, LBXBPB,BMXBMI),
                  statistic = list(all_categorical()~"{n_unweighted}/{N_unweighted} ({p_unweighted}%)",
                                   all_continuous() ~ "{mean} ({mean.std.error})"),
                  label = list(RIAGENDR ~ "Gender",
@@ -159,12 +158,52 @@ design_m %>%
                               LBXBPB ~ "Blood Lead Level (ug/dL)",
                               BMXBMI ~ "BMI"),
                  missing_text = "Missing",
-                 missing = "no",
+                 missing = "ifany",
                  digits = list(RIDAGEYR ~ c(1, 1),
                                LBXBPB ~ c(1, 1),
                                BMXBMI ~ c(1,1)),
                  
                  )
+
+
+```
+
+```{r results="asis"}
+my_labels <- list(
+  ecig = "E-cigarette Use",
+  RIAGENDR = "Gender",
+  RIDRETH3 = "Race/Ethnicity",
+  merit = "Marital Status",
+  inc = "Household Income Level",
+  educ = "Education Level",
+  alc = "Alcohol Consumption"
+)
+# attr(data$SEX,'label')  <- 'Gender'
+# attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# attr(data$CVD,'label')  <- 'CVD Status'
+
+
+my_controls <- tableby.control(
+  test = T,
+  total = F,
+  cat.stats = c("countpct", "Nmiss2"),
+  stats.labels = list(
+    meansd = "Mean (SD)",
+    medianq1q3 = "Median (Q1, Q3)",
+    Nmiss2 = "Missing"
+  )
+)
+
+dat <- data %>% filter(filter & SEQN!=99240)
+table <- arsenal::tableby(ecig ~  RIAGENDR+RIDRETH3+merit+inc +educ+alc, data = dat, control = my_controls, na.action = na.tableby(TRUE))
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Summary Statistic of NEHFS Data", 
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
 
 ```
 
@@ -174,20 +213,20 @@ design_m %>%
 ### models
 ```{r results='asis'}
 # unadjusted
-model_unadjusted <- svyglm(LBXBPB~SMQ905, design = design_m)
+model_unadjusted <- svyglm(log(LBXBPB)~SMQ905, design = design_m)
 sum_a <- model_unadjusted %>% tbl_regression()
 
 
 # adjusted: including race gives no CIs, test race effect by adding it into final model
-model_adjusted <- svyglm(LBXBPB~ SMQ905 + RIAGENDR + RIDAGEYR + BMXBMI + educ + alc + merit, design = design_m)
+model_adjusted <- svyglm(log(LBXBPB)~ SMQ905 + RIAGENDR + RIDAGEYR + BMXBMI + educ + alc + merit, design = design_m)
 sum_b <- model_adjusted %>%  tbl_regression()
 
 # interaction
-model_sex <- svyglm(LBXBPB~SMQ905*RIAGENDR, design = design_m)
+model_sex <- svyglm(log(LBXBPB)~SMQ905*RIAGENDR, design = design_m)
 sum_c <- model_sex %>%  tbl_regression()
 
 
-model_age <- svyglm(LBXBPB~SMQ905*RIDAGEYR, design = design_m)
+model_age <- svyglm(log(LBXBPB)~SMQ905*RIDAGEYR, design = design_m)
 sum_d <- model_age %>%  tbl_regression()
 
 
@@ -200,14 +239,40 @@ tbl_merge_sum <-
 tbl_merge_sum
 
 # final model: test for race effect
-model_final <- svyglm(LBXBPB~SMQ905+RIDAGEYR+RIAGENDR+RIDRETH3+BMXBMI+educ, design = design_m)
+model_final <- svyglm(log(LBXBPB)~SMQ905+RIDAGEYR+RIAGENDR+RIDRETH3+BMXBMI+educ, design = design_m)
 sum_e <- model_final %>%  tbl_regression()
 sum_e
 
 # final model
-model_final1 <- svyglm(LBXBPB~SMQ905+RIDAGEYR+RIAGENDR+BMXBMI+educ, design = design_m)
-sum_f <- model_final1 %>%  tbl_regression()
+model_final1 <- svyglm(log(LBXBPB)~SMQ905+RIDAGEYR+RIAGENDR+BMXBMI+educ, design = design_m)
+sum_f <- model_final1 %>%  tbl_regression(estimate_fun = purrr::partial(style_ratio, digits = 3))
 sum_f
+```
+
+### test for interaction term
+```{r}
+# interaction by age 
+model_finalinter <- svyglm(log(LBXBPB)~SMQ905*RIDAGEYR+RIAGENDR+BMXBMI+educ, design = design_m)
+anova(model_final1, model_finalinter)
+
+# interaction by age 
+model_finalinter1 <- svyglm(log(LBXBPB)~SMQ905*RIAGENDR+RIDAGEYR+BMXBMI+educ, design = design_m)
+anova(model_final1, model_finalinter1)
+```
+
+### final model diagnostics
+```{r}
+summary(model_final1)
+
+# normality
+hist(log(data$LBXBPB))
+svyqqplot(log(LBXBPB)~SMQ905, design = design_m)
+
+# constant residual & outliers
+plot(resid(model_final1)~model_final1$fitted.values)
+
+# R^2
+poliscidata::fit.svyglm(model_final1)[1]
 ```
 
 
@@ -245,17 +310,17 @@ tbl_merge_sum_1
 ### sensitivity analysis using age_65 & e-cig group
 ```{r}
 # sensitivity analysis: ineraction found
-model_sen <- svyglm(LBXBPB~ecig*age_65, design = design_m)
+model_sen <- svyglm(log(LBXBPB)~ecig*age_65, design = design_m)
 sum_i <- model_sen %>%  tbl_regression()
 
 # age >= 65
 design_65 <- subset(design_m, age_65=="65+")
-model_age65 <- svyglm(LBXBPB~ecig + RIAGENDR + RIDAGEYR+ BMXBMI + educ, design = design_65)
+model_age65 <- svyglm(log(LBXBPB)~ecig + RIAGENDR + RIDAGEYR+ BMXBMI + educ, design = design_65)
 sum_age1 <- model_age65 %>% tbl_regression()
 
 # age < 65
 design_64 <- subset(design_m, age_65=="<65")
-model_age64 <- svyglm(LBXBPB~ecig + RIAGENDR + RIDAGEYR + BMXBMI + educ, design = design_64)
+model_age64 <- svyglm(log(LBXBPB)~ecig + RIAGENDR + RIDAGEYR + BMXBMI + educ, design = design_64)
 sum_age2 <- model_age64 %>% tbl_regression()
 
 
@@ -275,3 +340,6 @@ tbl_merge_sum_2
 # sum_j <- model_sen1 %>%  tbl_regression()
 # sum_j
 ```
+
+
+
