@@ -1,0 +1,25 @@
+---
+title: "Statistical Analysis Plan"
+author: "Tuo Liu"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Study Aims & Objectives(including hypothesis)
+
+### Study Design
+
+### Measures
+
+
+### Analysis
+#### Preliminary Analysis for covariate imbalance & Treatment Effect
+#### Covariate Selection & Propensity Score Calculation
+#### Propensity Score Matching
+#### Outcome Analyis 
+#### Sensitivity Analysis
