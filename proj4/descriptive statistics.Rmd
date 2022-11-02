@@ -173,8 +173,6 @@ of receiving treatment and with the outcome.
 - Step Two: Balance of Propensity Score across Treatment and Comparison Groups
   
   
-  
-  
 - Step Three: Balance of Covariates across Treatment and Comparison Groups within Blocks of the Propensity Score
   
   
@@ -187,9 +185,11 @@ of receiving treatment and with the outcome.
   
 ### Example: [the effect of going to Catholic school, as opposed to public school, on student achievement](https://sejdemyr.github.io/r-tutorials/statistics/tutorial8.html)
 
-Steps	Suggested	for	Conducting a	Propensity Score	Analysis from A Practical	Introduction	Using	R: 
+Steps	Suggested	for	Conducting a	Propensity Score	Analysis from A Practical	Introduction	Using	R:   
+
 1. Preliminary analysis
-Before propensity scores are calculated, it is a good  practice to determine if the two groups are balanced. The standardized (mean) difference is a measure of distance between two group means in terms of one or more variables. In practice it is often used as a balance measure of individual covariates before and after propensity score matching. As it is standardized, comparison across variables on different scales is possible. For the standardized difference, absolute scores higher than _25%__ are considered suspect, and may indicate an imbalance for that specific variable. A statistically significant $\chi^2$ will indicate that at least one of the variables included in the model is creating an imbalance between the two groups. 
+
+Before propensity scores are calculated, it is a good practice to determine if the two groups are balanced. The standardized (mean) difference is a measure of distance between two group means in terms of one or more variables. In practice it is often used as a balance measure of individual covariates before and after propensity score matching. As it is standardized, comparison across variables on different scales is possible. For the standardized difference, absolute scores higher than __25%__ are considered suspect, and may indicate an imbalance for that specific variable. A statistically significant $\chi^2$ will indicate that at least one of the variables included in the model is creating an imbalance between the two groups. 
 ```{r}
 #################################################
 # Computing	indices	of co-variate imbalance	before matching 
@@ -203,10 +203,7 @@ lalonde <- lalonde %>% mutate(
   married = factor(married),
   nodegree = factor(nodegree)
 )
-# treated	<- (lalonde$treat==1)
-# cov	<- lalonde[,2:9]
-# std.diff	<- apply(cov,2,function(x)	100*(mean(x[treated])- mean(x[!treated]))/(sqrt(0.5*(var(x[treated])	+ var(x[!treated])))))
-# abs(std.diff)
+
 
 ## Covariates
 vars <- c("age","race","educ","married","nodegree","re74","re75","re78")
