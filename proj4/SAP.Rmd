@@ -7,19 +7,97 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt)
 ```
 
 
-### Study Aims & Objectives(including hypothesis)
+### Study Design & Objectives
+The National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS) is a longitudinal study that has a baseline visit and a follow-up visit about 10 years later. A total of 1629 cigarette smokers were enrolled at baseline, and interviews, examinations were administrated to investigate the effect of smoking cessation on weight gain.
 
-### Study Design
+The main objective of this project was to evaluate the effect of smoking cessation on weight gain. We hypothesized that quitting smoking would significantly increase participants' body weight. Another focus of the project would be to develop an understanding of how propensity score(PS) methods help account for potential confounding from subjects' demographic factors, including possibly sex, age, education, duration of smoking and other features. 
 
-### Measures
+### Statistical Analysis
+#### Measures
+The primary exposure predictor variable was smoking cessation, defined as treated if they reported having quit smoking before the follow-up visit, and as untreated otherwise according to the questionnaire and interview feedback. The primary outcome was weight gain (lbs) across two visits derived from examination results. 
+
+#### Preliminary Analysis for Covariate Imbalance Across Treatment Groups
+Subjects with missing value on weight difference between 1971 and 1982 (N=63) will be removed. Subjects who used weight loss medication (N=41) will also be excluded from this analysis. Table 1 presents a summary of the rest of complete samples before PS matching by stratification on smoking cessation status (Yes/No).
+
+```{r results='asis'}
+data <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
 
 
-### Analysis
-#### Preliminary Analysis for covariate imbalance & Treatment Effect
-#### Covariate Selection & Propensity Score Calculation
+# data prep
+data <- data %>% mutate(
+            qsmk=factor(qsmk),
+            sex=factor(sex),
+            race=factor(race),
+            education=factor(education),
+            income=factor(income),
+            marital=factor(marital)
+            )
+
+levels(data$qsmk) <- c("No", "Yes")
+levels(data$sex) <- c("Male", "Female")
+levels(data$race) <- c("White", "Other")
+levels(data$education) <- c("8th grade or less", "High school DROPOUT", "High school","College dropout", "College or more")
+
+
+# descriptive statistics for table 1
+my_labels <- list(
+  qsmk = "Quit smoking between 1971 and 1982",
+  sex = "Gender",
+  age = "Age (yrs) in 1971",
+  race = "Race",
+  education = "Education by 1971",
+  smkintensity82_71 = "Change in the number of cigarettes/day, 1971-1982",
+  smokeyrs = "Years of smoking",
+  wt82_71 = "Weight change, 1971-1982"
+)
+# # attr(data$SEX,'label')  <- 'Gender'
+# # attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# # attr(data$CVD,'label')  <- 'CVD Status'
+# 
+# 
+my_controls <- tableby.control(
+  test = F,
+  total = F,
+  #numeric.test = "anova", cat.test = "chisq",
+  numeric.stats = c("meansd"),
+  cat.stats = c("countpct"),
+  stats.labels = list(
+    meansd = "Mean (SD)"
+  )
+)
+
+table <- arsenal::tableby(qsmk ~  sex + age + race + marital + income + wt82_71 + education + smokeyrs + smkintensity82_71, data = data, control = my_controls)
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Summary Statistics of NHEFS 1971-1982 Data",
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
+```
+
+
+Before PS is calculated, it is a good practice to determine if the two groups are balanced regarding covariates. We will calculate the standardized mean difference(SMD) which is often used as a balance measure of individual covariates before and after propensity score matching.  As SMD is standardized, comparison across variables on different scales is possible. Any absolute SMD scores higher than __25%__ may indicate an imbalance for that variable across treament groups and predictor variables with a high SMD score will be included into the PS calculation model. We will also conduct an omnibus $\chi^2$ test on the balance across treatment groups. A statistically significant $\chi^2$ will indicate that at least one of the predictor variables is creating an imbalance between treatment groups. 
+
+
+
+#### Propensity Score Calculation
+We will run a logit regression model with __Treatment__ being the response variable to further identify potential confounders. All available predictor variables, except the outcome, will be included into the model. Any statistically significant predictor variables will be included in PS calculation model. Additionally, based on prior knowledge, predictor variables suspected to be associated with the outcome  will be included in the PS calculation model.  We will calculate the PS score using a logit model regressing on the treatment variable with the covariates identified in previous steps being the predictor variables. Variables that create imbalance between treatment groups shall be identified now.
+
 #### Propensity Score Matching
+We will carry out PS score matching using R package MatchIt. We will inspect goodness of matching by a combination of graphical and tabular approach. MatchIt provides summary tables that include mean(SD) for both treatment groups before and after matching, and figures demonstrating percentage improvement for the imbalance. We are aware of the fact that various matching algorithms are available in MatchIt, and we shall examine the impact of different algorithms on the relationship between the primary treatment and the primary outcome.
+
+
 #### Outcome Analyis 
+We will fit a simple linear regression model on the outcome (weight gain) and the treatment variable, and we will apply the backward stepwise selection method to construct the final multi-variable linear regression model and estimate the treatment effect of smoking cessation on weight gain. Multicolliearity will be inspected using correlation matrix, and model assumptions will be checked using graphical approach.
+
+
 #### Sensitivity Analysis
+Available matching algorithms will be applied in the PS score matching step. We will calculate the treatment effect for each algorithm and compare it across various algorithms.
+
+All analysis will be conducted in R (version 4.1.1).
