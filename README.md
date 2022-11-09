@@ -10,8 +10,10 @@ This repository commits to the application of biostatistics knowledge on clinica
   - research question: Is vaping associated with increased blood lead levels? Is there effect modification by age or gender?
 
 - Proj 3:
-  - data source: TBD
-  - research question: TBD
+  - data source: longitudinal data from study "A Phase 3 placebo-controlled, double-blind, multi-site trial of the alpha-2-adrenergic agonist, lofexidine, for opioid withdrawal"
+  - research question: 
+    - Is there group difference between the treatment group and placebo group with respect to MHOWS (parallel group response profiles)?
+    - Is there any time effect?
   
 - Proj 4:
   - data source: National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS) 1971&1982 follow-up data
