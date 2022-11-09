@@ -7,21 +7,68 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt)
+pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt, pwr)
 ```
+### Introduction
+Smoking cessation is linked to various health effects, such as lower risk of cardiovascular diseases and 90% reduction in the risk of death9(1). While most of these effects are beneficial, weight gain is hard to label because some individuals would experience excessive weight gain and develop obesity onset and diabetes after smoking cessation(2). To add on existing knowledge of the association between smokign cessation and weight gain and to unveil the driving factors of weight gain, we will conduct an anlysis using data from the National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS).
 
+### Study Design 
+NHEFS is a national longitudinal study that has a baseline visit completed between 1971-1975 and a series of subsequent follow-up visits that happened between 1971-1992.
 
-### Study Design & Objectives
-The National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS) is a longitudinal study that has a baseline visit and a follow-up visit about 10 years later. A total of 1629 cigarette smokers were enrolled at baseline, and interviews, examinations were administrated to investigate the effect of smoking cessation on weight gain.
+#### Study Description & Subsample
+The NHEFS cohort includes all subjects aged 25-74 years who completed a medical examination at NHANES I (baseline) in 1971-75 (n = 14,407). It combined information from personal interviews with subjects or their proxies; examination results of pulse rate, weight, and blood pressure, etc, to investigate the relationships between clinical, nutritional, and behavioral factors and subsequent morbidity, mortality. 
 
-The main objective of this project was to evaluate the effect of smoking cessation on weight gain. We hypothesized that quitting smoking would significantly increase participants' body weight. Another focus of the project would be to develop an understanding of how propensity score(PS) methods help account for potential confounding from subjects' demographic factors, including possibly sex, age, education, duration of smoking and other features. 
+#### Identification of Analysis Population  
+A subgroup of 1629 cigarette smokers were identified from 1971 visit and selected for this analysis.
+
+- Inclusion criteria
+  - Subjects who were cigarette smokers at 1971 (baseline visit)
+  - Subjects completed baseline (1971) and follow-up (1982) examination
+  
+- Exclusion criteria
+  - Subjects who used weight control or weight loss medication
+  - Subjects who died before 1982
+
+The final analysis set includes all subjects who were enrolled into the study, met all inclusion criteria and did not meet any exclusion criteria. The final analysis set will be used for this analysis.
+
+### Study Objectives
+#### Primary Objective
+The main objective of this project was to evaluate the effect of _smoking cessation on weight gain_. We hypothesized that quitting smoking would significantly increase participants' body weight. 
+
+#### Secondary Objective
+Another focus of the project would be to develop an understanding of how propensity score(PS) methods help account for potential confounding from subjects' demographic factors, including possibly __sex, age, education, duration of smoking and other features__. 
 
 ### Statistical Analysis
-#### Measures
-The primary exposure predictor variable was smoking cessation, defined as treated if they reported having quit smoking before the follow-up visit, and as untreated otherwise according to the questionnaire and interview feedback. The primary outcome was weight gain (lbs) across two visits derived from examination results. 
+#### Definition of Subgroups
+- Smoking cessation: Yes vs No
+- Gender: Male vs Female
+- Race: White vs Others
+- Marital status in 1971  1: Under 17, 2: Married, 3: Widowed, 4: Never married, 5: Divorced, 6: Separated, 8: Unknown
+- Education: 8th grade or less vs High school DROPOUT vs High school vs College dropout vs College or more
+- USE WEIGHT LOSS MEDICATION IN 1971: Yes vs No
 
-#### Preliminary Analysis for Covariate Imbalance Across Treatment Groups
-Subjects with missing value on weight difference between 1971 and 1982 (N=63) will be removed. Subjects who used weight loss medication (N=41) will also be excluded from this analysis. Table 1 presents a summary of the rest of complete samples before PS matching by stratification on smoking cessation status (Yes/No).
+#### Data Collected
+- Demographics: age in 1971, gender, ethnicity and race, geographical information
+- Height (cm) in 1971
+- Activity/exercise level
+- Lifestyle: alcohol consumption level, cigarette smoking level
+- Serum cholesterol (mg/100mL) in 1971
+- Weight in kilograms in 1971
+- Weight in kilograms in 1982
+- Weight change in kilograms
+- Systolic blood pressure in 1982
+- Diastolic blood pressure in 1982
+- Health status in 1971: asthma, chronic bronchitis, chronic cough, heart failure, hepatitis, hayfever, etc.
+- Medication usage for birth control pills, weight loss, high blood pressure, headache, allergies, Bowel trouble,lack of pep, infection, etc.
+
+
+#### Primary Outcome & Predictor
+The primary outcome was weight gain (kg) between two 1971 and 1982 visit. This will be assessed as the weight difference of the same subject between 1971 and 1982 (weight 1982-weight 1971), derived from examination results. 
+
+The primary exposure predictor variable was smoking cessation, defined as treated if subjects reported having quit smoking before the follow-up visit in 1982, and as untreated otherwise according to the questionnaire and interview feedback. 
+
+#### Preliminary Analysis for the primary outcome, predictor and covariates
+Subjects with missing value on weight difference between 1971 and 1982 (N=63) will be removed. Subjects who used weight loss medication (N=41) will also be excluded from this analysis. The final analysis set contains 1525 subjects. Table 1 presents a summary of the final analysis set before PS matching by stratification on smoking cessation status (Yes/No).
 
 ```{r results='asis'}
 data <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
@@ -34,25 +81,34 @@ data <- data %>% mutate(
             race=factor(race),
             education=factor(education),
             income=factor(income),
-            marital=factor(marital)
+            marital=factor(marital),
+            alcoholfreq=factor(alcoholfreq),
+            exercise=factor(exercise)
             )
 
 levels(data$qsmk) <- c("No", "Yes")
 levels(data$sex) <- c("Male", "Female")
 levels(data$race) <- c("White", "Other")
 levels(data$education) <- c("8th grade or less", "High school DROPOUT", "High school","College dropout", "College or more")
+levels(data$marital) <- c('Married', 'Widowed', 'Never married', 'Divorced', 'Separated', NA)
+levels(data$alcoholfreq) <- c('Almost every day',  '2-3 times/week','1-4 times/month', '< 12 times/year', 'No alcohol last year', NA)
+levels(data$exercise) <- c('much exercise','moderate exercise','little or no exercise')
 
 
 # descriptive statistics for table 1
 my_labels <- list(
-  qsmk = "Quit smoking between 1971 and 1982",
+  qsmk = "Quitted Smoking, 1971-1982",
   sex = "Gender",
-  age = "Age (yrs) in 1971",
+  age = "Age (yrs)",
   race = "Race",
-  education = "Education by 1971",
-  smkintensity82_71 = "Change in the number of cigarettes/day, 1971-1982",
-  smokeyrs = "Years of smoking",
-  wt82_71 = "Weight change, 1971-1982"
+  marital = "Marital Status",
+  education = "Education Level",
+  smokeyrs = "Years of Smoking",
+  alcoholfreq = "Frequency of Alcohol Consumption",
+  wt82_71 = "Weight Change, 1971-1982",
+  exercise = "Exercise Level",
+  ht = "Height (cm)",
+  cholesterol = "Serum cholesterol (mg/100mL)"
 )
 # # attr(data$SEX,'label')  <- 'Gender'
 # # attr(data$PERIOD,'label')  <- 'Examination Cycle'
@@ -61,20 +117,21 @@ my_labels <- list(
 # 
 my_controls <- tableby.control(
   test = F,
-  total = F,
+  total = T,
   #numeric.test = "anova", cat.test = "chisq",
-  numeric.stats = c("meansd"),
-  cat.stats = c("countpct"),
+  numeric.stats = c("meansd", "Nmiss2"),
+  cat.stats = c("countpct", "Nmiss2"),
   stats.labels = list(
-    meansd = "Mean (SD)"
+    meansd = "Mean (SD)",
+    Nmiss2 = "Missing"
   )
 )
 
-table <- arsenal::tableby(qsmk ~  sex + age + race + marital + income + wt82_71 + education + smokeyrs + smkintensity82_71, data = data, control = my_controls)
+table <- arsenal::tableby(qsmk ~  sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise + ht + cholesterol + wt82_71, data = data, control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
-  title = "Summary Statistics of NHEFS 1971-1982 Data",
+  title = "Baseline Characteristics Summary of the Final Analysis Set from NHEFS(1971-1982)",
   pfootnote=TRUE,
   results="asis",
   digits=1
@@ -82,8 +139,8 @@ summary(table,
 ```
 
 
+#### Covariate Imbalance Across Treatment Groups
 Before PS is calculated, it is a good practice to determine if the two groups are balanced regarding covariates. We will calculate the standardized mean difference(SMD) which is often used as a balance measure of individual covariates before and after propensity score matching.  As SMD is standardized, comparison across variables on different scales is possible. Any absolute SMD scores higher than __25%__ may indicate an imbalance for that variable across treament groups and predictor variables with a high SMD score will be included into the PS calculation model. We will also conduct an omnibus $\chi^2$ test on the balance across treatment groups. A statistically significant $\chi^2$ will indicate that at least one of the predictor variables is creating an imbalance between treatment groups. 
-
 
 
 #### Propensity Score Calculation
@@ -94,10 +151,40 @@ We will carry out PS score matching using R package MatchIt. We will inspect goo
 
 
 #### Outcome Analyis 
-We will fit a simple linear regression model on the outcome (weight gain) and the treatment variable, and we will apply the backward stepwise selection method to construct the final multi-variable linear regression model and estimate the treatment effect of smoking cessation on weight gain. Multicolliearity will be inspected using correlation matrix, and model assumptions will be checked using graphical approach.
+We will fit a simple linear regression model on the primary outcome (weight gain) and the treatment variable, and we will then fit a multi-variable linear regression model and apply the backward stepwise selection method to construct the final model and estimate the treatment effect. Multicolliearity will be inspected using the simple correlation matrix, and model assumptions will be checked using a graphical approach.
 
 
 #### Sensitivity Analysis
 Available matching algorithms will be applied in the PS score matching step. We will calculate the treatment effect for each algorithm and compare it across various algorithms.
 
 All analysis will be conducted in R (version 4.1.1).
+
+### Handling of Missing and Incomplete Data
+In case of missing data for any variable, the information on the number of subjects with missing data will be displayed in Table 1. For categorical variables, the percentages will be calculated based on all available data (missing and non-missing). The subjects with missing information will be included in the calculations. No imputation rules will be applied. 
+
+
+
+### Power analysis
+We assume that all 396 subjects in the treatment group will get matched with the reference group (N=1129). Based on the assumption that weight gain follows a Guassian distribution, a sample size of 396 subjects in non-treatment group and a number of 396 subjects in the treatment group are expected to ensure at above 90% chance to detecting a “true” effect, when the effect exists, which is considered as a good statistical power. 
+```{r}
+pwr.t2n.test(n1 = 396, n2= 396, d = 0.5, sig.level =0.05)
+```
+
+### Reference
+
+### Appendix
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
