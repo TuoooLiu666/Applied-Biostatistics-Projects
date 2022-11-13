@@ -1,0 +1,94 @@
+---
+title: "proj3"
+author: "Tuo Liu"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(tidyverse, nlme, arsenal)
+```
+
+### Study Description
+
+
+### Summary Statistics: baseline demographics
+```{r}
+# data read-in
+demo <- read.csv("./data/base_end.csv")
+withdraw <- read.csv("./data/withdraw.csv")
+emesis <- read.csv("./data/emesis.csv")
+```
+
+```{r results='asis'}
+# data prep
+demo<- demo %>% mutate(
+            treat=factor(treat),
+            gender=factor(gender),
+            smoke=factor(smoke),
+            oral_nasal_smoke=factor(oral_nasal_smoke),
+            IV = factor(IV)
+            )
+
+levels(demo$gender) <- c("Male", "Female")
+levels(demo$smoke) <- c("No", "Yes")
+levels(demo$oral_nasal_smoke) <- c("No", "Yes")
+levels(demo$IV) <- c("No", "Yes")
+
+
+# descriptive statistics for table 1
+my_labels <- list(
+  treat = "treatment arm",
+  gender = "Sex (N, %)",
+  age = "Age at randomization (Mean ± S.D.)",
+  educ_yr = "Years of education completed (Mean ± S.D.)",
+  smoke = "Currently smoking cigarettes (N, %)",
+  oral_nasal_smoke = "oral/nasal/smoke",
+  days_use_30d = "Days of opiate use in last 30 days (Mean ± S.D.)"
+)
+# # attr(data$SEX,'label')  <- 'Gender'
+# # attr(data$PERIOD,'label')  <- 'Examination Cycle'
+# # attr(data$CVD,'label')  <- 'CVD Status'
+
+my_controls <- tableby.control(
+  test = F,
+  total = T,
+  #numeric.test = "anova", cat.test = "chisq",
+  numeric.stats = c("meansd"),
+  cat.stats = c("countpct"),
+  stats.labels = list(
+    meansd = "Mean (SD)",
+    countpct = "N (%)"
+  )
+)
+
+table <- arsenal::tableby(treat ~  age + gender + educ_yr  + smoke + oral_nasal_smoke + IV + days_use_30d, data = demo, control = my_controls)
+
+summary(table,
+  labelTranslations = my_labels,
+  title = "Baseline demographics",
+  pfootnote=TRUE,
+  results="asis",
+  digits=1
+)
+```
+
+
+
+### MHOWS score calculation: discontinuous signs  
+- Q1-Q4: 1 point if 2
+- Q5-Q6: 3 points if 2
+- Q7: 5 points if 2
+- Q8A-C: 3 points if any of A-C has 1/2.
+
+### Missing data imputation
+
+### Longitudianl analysis
+
+
+
+
+
+
+
