@@ -7,11 +7,16 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, nlme, arsenal)
+pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer)
 ```
 
 ### Study Description
 
+This project uses data derived from a phase III randomized controlled trial comparing Iofexidine versus placebo for opioid withdrawal symptoms. This was an 11-day longitudinal study with balanced study design but substantial amount of missing data due to dropouts.
+
+The Modified Himmelsbach Opiate Withdrawal Scale (MHOWS) was chosen as the primary outcome since it is an objective assessment of the severity of opioid withdrawal signs. A weighted point value was assigned to each of the discontinuous and continuous signs for each subject. The final MHOWS was calculated as a linear combination of the weighted points of withdrawal signs.
+
+The primary predictor of interests were time measured as days after randomization and treatment arm (1 if Iofexidine group; 0 placebo). The study objectives of this study was to assess the pattern of change in the mean response over time and whether the pattern of change in the mean response over time differs between treatment arms.
 
 ### Summary Statistics: baseline demographics
 ```{r}
@@ -67,7 +72,7 @@ table <- arsenal::tableby(treat ~  age + gender + educ_yr  + smoke + oral_nasal_
 
 summary(table,
   labelTranslations = my_labels,
-  title = "Baseline demographics",
+  title = "Baseline Demographics",
   pfootnote=TRUE,
   results="asis",
   digits=1
@@ -77,17 +82,59 @@ summary(table,
 
 
 ### MHOWS score calculation: discontinuous signs  
-- Q1-Q4: 1 point if 2
-- Q5-Q6: 3 points if 2
-- Q7: 5 points if 2
-- Q8A-C: 3 points if any of A-C has 1/2.
+- Q1-Q4: 1 point if 2; 0 point otherwise
+- Q5-Q6: 3 points if 2; 0 otherwise
+- Q7: 5 points if 2; 0 otherwise
+- Q8A-C: 3 points if any of A-C has 1/2; 0 otherwise
+- emesis: 0 point if no episode; 5 point if 1 episode; 10 points if 2; 15 if 3 episodes
+
+```{r}
+# emsis
+emesis[emesis==0]<- NA
+emesis$eipsode <- rowSums(!is.na(emesis[,4:21]))
+
+emesis$emesis <- ifelse(emesis$eipsode==0, 0, 
+                        ifelse(emesis$eipsode==1,5, 
+                               ifelse(emesis$eipsode==2, 10, 15)))
+# withdraw
+withdraw$pts_Q1 <- ifelse(withdraw$Q1==2, 1, 0)
+withdraw$pts_Q2 <- ifelse(withdraw$Q2==2, 1, 0)
+withdraw$pts_Q3 <- ifelse(withdraw$Q3==2, 1, 0)
+withdraw$pts_Q4 <- ifelse(withdraw$Q4==2, 1, 0)
+withdraw$pts_Q5 <- ifelse(withdraw$Q5==2, 3, 0)
+withdraw$pts_Q6 <- ifelse(withdraw$Q6==2, 3, 0)
+withdraw$pts_Q7 <- ifelse(withdraw$Q7==2, 5, 0)
+withdraw$pts_Q8 <- ifelse(withdraw$Q8A %in% c(1,2)|withdraw$Q8B %in% c(1,2)|withdraw$Q8C %in% c(1,2), 3, 0)
+
+# combine emsis score
+data <- inner_join(withdraw, emesis %>% select(1, 3, 23), by = c("PATIENT"="PATIENT", "day"="STDYDAY"))
+
+
+# calculate MHOWS
+data$MHOWS <- rowSums(data[,23:36])
+```
+
 
 ### Missing data imputation
+```{r}
+plot_missing(data)
+```
+
 
 ### Longitudianl analysis
+#### analysis with raw data
+```{r message=FALSE}
+#summarize data
+data %>% group_by(treat,day) %>% 
+  summarise(n=n(),means=mean(MHOWS, na.rm=T),stdev=sd(MHOWS, na.rm=T)) %>% 
+  knitr::kable(digits = 2)
+```
+```{r}
+
+```
 
 
-
+#### analysis with imputed data
 
 
 
