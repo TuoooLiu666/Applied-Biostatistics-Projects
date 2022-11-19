@@ -26,7 +26,7 @@ withdraw <- read.csv("./data/withdraw.csv")
 emesis <- read.csv("./data/emesis.csv")
 ```
 
-```{r results='asis'}
+```{r results='asis', message=FALSE}
 # data prep
 demo<- demo %>% mutate(
             treat=factor(treat),
@@ -118,24 +118,40 @@ data$MHOWS <- rowSums(data[,23:36])
 ### Missing data imputation
 ```{r}
 plot_missing(data)
+histogram(data$MHOWS)
 ```
-
 
 ### Longitudianl analysis
 #### analysis with raw data
 ```{r message=FALSE}
-#summarize data
-data %>% group_by(treat,day) %>% 
-  summarise(n=n(),means=mean(MHOWS, na.rm=T),stdev=sd(MHOWS, na.rm=T)) %>% 
+# summarize data
+data.sum <- data %>% group_by(treat,day) %>% 
+  summarise(n=n(),means=mean(MHOWS, na.rm=T),stdev=sd(MHOWS, na.rm=T)) 
+
+data.sum %>% 
   knitr::kable(digits = 2)
-```
-```{r}
 
-```
 
+# plot mean profile over time
+scaleFUN <- function(x) sprintf("%.0f", x)
+
+# %>% filter(day != c(1,2))
+ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
+  geom_point(size=3) + 
+  geom_line() + 
+  scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
+  scale_x_continuous(labels=scaleFUN, limits = c(1, 10), breaks = c(1:10)) + 
+  scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
+  labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") + 
+  theme_classic()
+
+ggsave("mean_response.png", width = 6, height = 3)
+```
 
 #### analysis with imputed data
 
+
+### Sensitivity analysis with respect to Missing Data
 
 
 
