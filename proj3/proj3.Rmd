@@ -7,7 +7,7 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer)
+pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2)
 ```
 
 ### Study Description
@@ -22,7 +22,7 @@ The primary predictor of interests were time measured as days after randomizatio
 ```{r}
 # data read-in
 demo <- read.csv("./data/base_end.csv")
-withdraw <- read.csv("./data/withdraw.csv")
+withdraw <- read.csv("./data/withdraw.csv") %>% distinct(PATIENT, treat, day, .keep_all = T)
 emesis <- read.csv("./data/emesis.csv")
 ```
 
@@ -97,21 +97,28 @@ emesis$emesis <- ifelse(emesis$eipsode==0, 0,
                         ifelse(emesis$eipsode==1,5, 
                                ifelse(emesis$eipsode==2, 10, 15)))
 # withdraw
-withdraw$pts_Q1 <- ifelse(withdraw$Q1==2, 1, 0)
-withdraw$pts_Q2 <- ifelse(withdraw$Q2==2, 1, 0)
-withdraw$pts_Q3 <- ifelse(withdraw$Q3==2, 1, 0)
-withdraw$pts_Q4 <- ifelse(withdraw$Q4==2, 1, 0)
-withdraw$pts_Q5 <- ifelse(withdraw$Q5==2, 3, 0)
-withdraw$pts_Q6 <- ifelse(withdraw$Q6==2, 3, 0)
-withdraw$pts_Q7 <- ifelse(withdraw$Q7==2, 5, 0)
+withdraw$pts_Q1 <- ifelse(withdraw$Q1==2, 1, 
+                          ifelse(withdraw$Q1==1, 0, NA))
+withdraw$pts_Q2 <- ifelse(withdraw$Q2==2, 1, 
+                          ifelse(withdraw$Q2==1, 0, NA))
+withdraw$pts_Q3 <- ifelse(withdraw$Q3==2, 1, 
+                          ifelse(withdraw$Q3==1, 0, NA))
+withdraw$pts_Q4 <- ifelse(withdraw$Q4==2, 1, 
+                          ifelse(withdraw$Q4==1, 0, NA))
+withdraw$pts_Q5 <- ifelse(withdraw$Q5==2, 3, 
+                          ifelse(withdraw$Q5==1, 0, NA))
+withdraw$pts_Q6 <- ifelse(withdraw$Q6==2, 3, 
+                          ifelse(withdraw$Q6==1, 0, NA))
+withdraw$pts_Q7 <- ifelse(withdraw$Q7==2, 5, 
+                          ifelse(withdraw$Q7==1, 0, NA))
 withdraw$pts_Q8 <- ifelse(withdraw$Q8A %in% c(1,2)|withdraw$Q8B %in% c(1,2)|withdraw$Q8C %in% c(1,2), 3, 0)
+withdraw$pts <-  rowSums(withdraw[,23:35])
 
 # combine emsis score
-data <- inner_join(withdraw, emesis %>% select(1, 3, 23), by = c("PATIENT"="PATIENT", "day"="STDYDAY"))
-
+data <- dplyr::full_join(withdraw %>% select(1:3, 36), emesis %>% select(1:3, 23) %>% arrange(treat), by = c("PATIENT"="PATIENT", "treat"="treat", "day"="STDYDAY"))
 
 # calculate MHOWS
-data$MHOWS <- rowSums(data[,23:36])
+data$MHOWS <- rowSums(data[,4:5])
 ```
 
 
@@ -123,6 +130,7 @@ histogram(data$MHOWS)
 
 ### Longitudianl analysis
 #### analysis with raw data
+##### Sample means and sds
 ```{r message=FALSE}
 # summarize data
 data.sum <- data %>% group_by(treat,day) %>% 
@@ -147,6 +155,39 @@ ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
 
 ggsave("mean_response.png", width = 6, height = 3)
 ```
+
+##### sample variance-covariance matrix 
+```{r}
+data_wide <- tidyr::spread(data %>% select(1:3,6), key = day, value = MHOWS) %>% select(1:2, 5:10)
+
+# calculate sample variance-covariance matrix
+cov(data_wide[,3:8], use = "complete.obs")
+```
+
+
+#### complete-case analysis
+```{r}
+# categorize day
+data$dayN <- as.factor(data$day)
+
+# subset day3-8
+dat <- data %>% filter(day %in% c(3:8))
+
+
+# fit maximal model with categorized dayN
+mod1 <- gls(MHOWS~dayN*treat, 
+            data=dat,
+            corr=corSymm(form=~1|PATIENT),
+            weights=varIdent(form=~1|dayN),
+            method="REML",
+            na.action = na.omit)
+mod1 %>% summary()
+
+# inspect variance-covariance matrix
+getVarCov(mod1)
+```
+
+We saw significant treatment-time interaction effects for day4-day6, indicating the change pattern in mean MHOWS score over time was different between the treatment and placebo group.
 
 #### analysis with imputed data
 
