@@ -7,7 +7,7 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2)
+pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2,broom.mixed)
 ```
 
 ### Study Description
@@ -19,11 +19,12 @@ The Modified Himmelsbach Opiate Withdrawal Scale (MHOWS) was chosen as the prima
 The primary predictor of interests were time measured as days after randomization and treatment arm (1 if Iofexidine group; 0 placebo). The study objectives of this study was to assess the pattern of change in the mean response over time and whether the pattern of change in the mean response over time differs between treatment arms.
 
 ### Summary Statistics: baseline demographics
+Two participants were removed as they dropped out since day 3.
 ```{r}
 # data read-in
-demo <- read.csv("./data/base_end.csv")
-withdraw <- read.csv("./data/withdraw.csv") %>% distinct(PATIENT, treat, day, .keep_all = T) 
-emesis <- read.csv("./data/emesis.csv")
+demo <- read.csv("./data/base_end.csv") %>% filter(!PATIENT %in% c(28482, 930174))
+withdraw <- read.csv("./data/withdraw.csv") %>% distinct(PATIENT, treat, day, .keep_all = T) %>% filter(!PATIENT %in% c(28482, 930174))
+emesis <- read.csv("./data/emesis.csv") %>% filter(!PATIENT %in% c(28482, 930174))
 ```
 
 ```{r results='asis', message=FALSE}
@@ -122,11 +123,6 @@ data$MHOWS <- rowSums(data[,4:5])
 ```
 
 
-### Missing data imputation
-```{r}
-plot_missing(data)
-histogram(data$MHOWS)
-```
 
 ### Longitudianl analysis
 #### Sample means and sds
@@ -140,31 +136,41 @@ data.sum %>%
 
 
 # plot mean profile over time
-scaleFUN <- function(x) sprintf("%.0f", x)
+# scaleFUN <- function(x) sprintf("%.0f", x)
 
 # %>% filter(day != c(1,2))
-ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
-  geom_point(size=3) + 
-  geom_line() + 
-  scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
-  scale_x_continuous(labels=scaleFUN, limits = c(1, 10), breaks = c(1:10)) + 
-  scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
-  labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") + 
-  theme_classic()
+# ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
+#   geom_point(size=3) + 
+#   geom_line() + 
+#   scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
+#   scale_x_continuous(labels=scaleFUN, limits = c(1, 10), breaks = c(1:10)) + 
+#   scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
+#   labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") + 
+#   theme_classic()
 
-ggsave("mean_response.png", width = 6, height = 3)
+# ggsave("mean_response.png", width = 6, height = 3)
 ```
 
 #### Primary analysis with imputed data
 ##### sample variance-covariance matrix 
+Some things are easier in the wide format, e.g., change scores or imputing data, while other procedures are easier in the long format, e.g., graphics and advanced statistical modeling. It is therefore useful to have both formats available.
 ```{r}
-data_wide <- tidyr::spread(data %>% select(1:3,6), key = day, value = MHOWS) %>% select(1:2, 5:10) %>% filter(!PATIENT %in% c(28482, 930174)) %>% mutate(treat=factor(treat))
+data_wide <- tidyr::spread(data %>% select(1:3,6), key = day, value = MHOWS) %>% select(1:2, 5:10) %>% mutate(treat=factor(treat))
 
 # calculate sample variance-covariance matrix
-cov(data_wide[,3:8], use = "complete.obs")
+cov(data_wide[,3:8], use = "complete.obs") %>% knitr::kable(digits = 2)
 ```
 
-##### Mixed-MI: categorical time
+##### Missing pattern
+```{r}
+md.pattern(data_wide)
+```
+The missingness pattern shows that there are 170 missing values in total: 5 for day4 , 30 for day5, 40 for day6, 47 for day7,  and 48 for day8. Moreover, there are 16 completely observations. The overall missing pattern was non-monotone with 48 cases followed a "monotone" missing pattern and 2 followed "non-monotone pattern". 
+
+
+
+
+##### Mixed-MI: categorical time comparing post-treat timepoint to baseline
 ```{r}
 colnames(data_wide) <- c("PATIENT","treat",paste0("day", 3:8))
 
@@ -185,7 +191,7 @@ imp_dat <- mice(data_wide,
 # imp_dat$method
 
 # fit the models to the imputed data
-mods <- with(imp_dat,
+mod11 <- with(imp_dat,
              {
                dat <- data.frame(treat = treat,
                                  PATIENT = PATIENT,
@@ -204,12 +210,13 @@ mods <- with(imp_dat,
                    data = dat_long)
              })
 
-summary(mice::pool(mods))
+mod11_df <- summary(mice::pool(mod11)) 
+mod11_df %>% knitr::kable(digits = 2)
 ```
 ##### Mixed-MI: numerical time-parametric trend
 ```{r}
 # fit the models to the imputed data
-mods <- with(imp_dat,
+mod22 <- with(imp_dat,
              {
                dat <- data.frame(treat = treat,
                                  PATIENT = PATIENT,
@@ -234,7 +241,8 @@ mods <- with(imp_dat,
                    data = dat_long)
              })
 
-summary(mice::pool(mods))
+mod22_df <- summary(mice::pool(mod22)) 
+mod22_df %>% knitr::kable(digits = 2)
 ```
 
 
@@ -249,21 +257,86 @@ dat <- data %>% filter(day %in% c(3:8))
 
 
 # fit maximal model with categorized dayN
-mod1 <- gls(MHOWS~dayN*treat, 
-            data=dat,
-            corr=corSymm(form=~1|PATIENT),
-            weights=varIdent(form=~1|dayN),
-            method="REML",
+mod1 <- lme(MHOWS ~ dayN*treat,
+            random = ~1|PATIENT,
+            data = dat,
             na.action = na.omit)
-mod1 %>% summary()
 
+mod1_df <- as.data.frame(coef(summary(mod1)))
+mod1_df %>% knitr::kable(digits = 2)
 # inspect variance-covariance matrix
-getVarCov(mod1)
+# getVarCov(mod1)  %>% knitr::kable(digits = 2)
 ```
 We saw significant treatment-time interaction effects for day4-day6, indicating the change pattern in mean MHOWS score over time was different between the treatment and placebo group.
 
+```{r}
+# continuous day
+# subset day3-8
+dat <- data %>% filter(day %in% c(3:8))
+
+
+# fit maximal model with categorized dayN
+mod2 <- lme(MHOWS ~ day*treat,
+            random = ~1|PATIENT,
+            data = dat,
+            na.action = na.omit)
+mod2_df <- as.data.frame(coef(summary(mod2)))
+mod2_df %>% knitr::kable(digits = 2)
+# inspect variance-covariance matrix
+# getVarCov(mod2) %>% knitr::kable(digits = 2)
+```
+
+#### effect comparison between analysis after MICE imputation and Complete-case analysis
+```{r}
+c2 <- mod2_df %>% mutate(term=row.names(.)) %>% select(6,1,2,5) %>% rename(estimate=Value, std.error=Std.Error, p.value=`p-value`)
+mi2 <- mod22_df %>% select(1:3,6)
+df2 <- gdata::combine(mi2, c2)
+df2$term <- str_replace(df2$term, "treatPLACEBO", "Placebo")
+
+
+c1 <- mod1_df %>% mutate(term=row.names(.)) %>% select(6,1,2,5) %>% rename(estimate=Value, std.error=Std.Error, p.value=`p-value`)
+mi1 <- mod11_df %>% select(1:3,6)
+df1 <- gdata::combine(mi1, c1)
+
+df1$term <- str_replace(df1$term, "dayday", "dayN")
+df1$term <- str_replace(df1$term, "treatPLACEBO", "Placebo")
+
+
+df <- gdata::combine(df1,df2)
+df$source.1 <- factor(df$source.1, levels = c("df1", "df2"),
+                  labels = c("Categorical time", "Linear Trend")
+                  )
+# plot
+pd <- position_dodge(0.1) # move them .05 to the left and right
+
+ggplot(df, aes(x=term, y=estimate, colour=source, group=source)) + 
+    geom_errorbar(aes(ymin=estimate-std.error, ymax=estimate+std.error), colour="black", width=.1, position=pd) +
+    geom_point(position=pd, size=3, shape=21, fill="white") + # 21 is filled circle
+  facet_wrap(~source.1, scales = "free") +
+    xlab("Term") +
+    ylab("Estimate") +
+    scale_colour_hue(name="Analysis choice",    # Legend label, use darker colors
+                     labels=c("Complete-case", "MICE"),
+                     breaks=c("mi1", "c1"),
+                     l=40) +                    # Use darker colors, lightness=40
+    expand_limits(y=0) +                        # Expand y range
+    scale_y_continuous(breaks=0:20*4) +         # Set tick every 4
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position=c(.8,.8)) 
+
+
+# ggsave("est comparison.png", width = 8, height = 4)
+```
+
+
+
 
 ### diagnostics
+```{r}
+# checking on distribution of response
+histogram(data$MHOWS)
+```
 
 
 
