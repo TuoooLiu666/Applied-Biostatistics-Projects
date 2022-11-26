@@ -7,7 +7,7 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2,broom.mixed)
+pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2,broom.mixed, ggResidpanel,gplots)
 ```
 
 ### Study Description
@@ -136,19 +136,19 @@ data.sum %>%
 
 
 # plot mean profile over time
-# scaleFUN <- function(x) sprintf("%.0f", x)
+scaleFUN <- function(x) sprintf("%.0f", x)
 
 # %>% filter(day != c(1,2))
-# ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
-#   geom_point(size=3) + 
-#   geom_line() + 
-#   scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
-#   scale_x_continuous(labels=scaleFUN, limits = c(1, 10), breaks = c(1:10)) + 
-#   scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
-#   labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") + 
-#   theme_classic()
+ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
+  geom_point(size=3) +
+  geom_line() +
+  scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
+  scale_x_continuous(labels=scaleFUN, limits = c(1, 10), breaks = c(1:10)) +
+  scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
+  labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") +
+  theme_classic()
 
-# ggsave("mean_response.png", width = 6, height = 3)
+ggsave("mean_response.png", width = 6, height = 3)
 ```
 
 #### Primary analysis with imputed data
@@ -163,7 +163,9 @@ cov(data_wide[,3:8], use = "complete.obs") %>% knitr::kable(digits = 2)
 
 ##### Missing pattern
 ```{r}
-md.pattern(data_wide)
+png(filename="./missing_pattern.png",  width=480, height=480)
+md.pattern(data_wide, rotate.names = T)
+dev.off()
 ```
 The missingness pattern shows that there are 170 missing values in total: 5 for day4 , 30 for day5, 40 for day6, 47 for day7,  and 48 for day8. Moreover, there are 16 completely observations. The overall missing pattern was non-monotone with 48 cases followed a "monotone" missing pattern and 2 followed "non-monotone pattern". 
 
@@ -189,6 +191,33 @@ imp_dat <- mice(data_wide,
 
 # double-check imputation method used for repeated measurements
 # imp_dat$method
+
+# summary meansd
+# calculate some descriptive statistics
+imp_dat_wide <- complete(imp_dat, include = F, action = "long")
+
+imp_sum <- imp_dat_wide %>% 
+  melt(
+    id.vars=c(".imp", "PATIENT", "treat"), value.name="y", measure.vars=c("day3", "day4", "day5","day6","day7", "day8")) %>%
+  group_by(.imp, treat, variable) %>%
+  summarize(n=n(),
+            mean=mean(y),
+            sd=sd(y))
+levels(imp_sum$variable) <- 3:8
+imp_sum$day<- as.numeric(imp_sum$variable)+2
+# plot
+ggplot(imp_sum,aes(x=day,y=mean,group=treat,colour=treat)) +
+  geom_point(size=3) +
+  geom_line() +
+  scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
+  scale_x_continuous(limits = c(1, 10), breaks = c(1:10)) +
+  scale_y_continuous(labels=scaleFUN, limits = c(0, 50), breaks = c(5,10,15,20,25,30,35,40,45,50)) +
+  labs(x="Day",y="Mean MHOWS",title="Mean MHOWS Over Time") +
+  theme_classic()+
+  facet_wrap(~.imp, nrow=5)
+
+ggsave("mean_response_imp.png", width = 6, height = 8)
+
 
 # fit the models to the imputed data
 mod11 <- with(imp_dat,
@@ -267,7 +296,7 @@ mod1_df %>% knitr::kable(digits = 2)
 # inspect variance-covariance matrix
 # getVarCov(mod1)  %>% knitr::kable(digits = 2)
 ```
-We saw significant treatment-time interaction effects for day4-day6, indicating the change pattern in mean MHOWS score over time was different between the treatment and placebo group.
+We saw significant treatment-time interactions on day4-day6, indicating the change pattern in mean MHOWS score over time was different between the treatment and placebo group.
 
 ```{r}
 # continuous day
@@ -335,8 +364,35 @@ ggplot(df, aes(x=term, y=estimate, colour=source, group=source)) +
 ### diagnostics
 ```{r}
 # checking on distribution of response
+png(filename="./MHOWS_his.png",  width=600)
 histogram(data$MHOWS)
+dev.off()
 ```
+#### mixed model diagnostics
+```{r}
+# select the first complete dataset to fit lme
+imp_dat_wide_1 <- imp_dat_wide %>% filter(.imp==1) %>% 
+  melt(id.vars=c("PATIENT", "treat"), value.name="y", 
+       measure.vars=c("day3", "day4", "day5","day6","day7", "day8"))
+levels(imp_dat_wide_1$variable) <- 3:8
+imp_dat_wide_1$day<- as.numeric(imp_dat_wide_1$variable)+2
 
+
+mod_s <- lme(y ~ day*treat,
+            random = ~1|PATIENT,
+            data = imp_dat_wide_1)
+
+png(filename="./resid_hist.png",  width=600)
+resid_panel(mod_s, plots=c("hist"), type = "response")
+dev.off()
+
+png(filename="./qq.png",  width=600)
+resid_panel(mod_s, plots=c("qq"), type = "response")
+dev.off()
+
+png(filename="./resid-fitted.png",  width=600)
+resid_panel(mod_s, plots=c("resid"),  smoother=T, type = "response")
+dev.off()
+```
 
 
