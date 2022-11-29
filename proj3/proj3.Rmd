@@ -139,7 +139,7 @@ data.sum %>%
 scaleFUN <- function(x) sprintf("%.0f", x)
 
 # %>% filter(day != c(1,2))
-ggplot(data.sum,aes(x=day,y=means,group=treat,colour=treat)) +
+ggplot(data.sum %>% filter(!day %in% c(1,2, 9,10 )),aes(x=day ,y=means,group=treat,colour=treat)) +
   geom_point(size=3) +
   geom_line() +
   scale_color_manual(name="Treatment",values=c("dodgerblue4","darkorange")) +
@@ -359,6 +359,253 @@ ggplot(df, aes(x=term, y=estimate, colour=source, group=source)) +
 ```
 
 
+#### effect comparison for m
+categorical time model
+```{r}
+imp_dat_10 <- mice(data_wide, m=10,
+                printFlag = FALSE,
+                predictorMatrix = pred,
+                seed = 2022)
+imp_dat_20 <- mice(data_wide, m=20,
+                printFlag = FALSE,
+                predictorMatrix = pred,
+                seed = 2022)
+imp_dat_50 <- mice(data_wide, m=50,
+                printFlag = FALSE,
+                predictorMatrix = pred,
+                seed = 2022)
+
+# fit the models to the imputed data
+# m=10
+mod110 <- with(imp_dat_10,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 day3 = day3,
+                                 day4 = day4,
+                                 day5 = day5,
+                                 day6 = day6,
+                                 day7 = day7,
+                                 day8 = day8)
+               dat_long <- pivot_longer(dat,
+                                        cols = contains("day"),
+                                        names_to = "day",
+                                        values_to = "y")
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod110_df <- summary(mice::pool(mod110)) 
+mod110_df %>% knitr::kable(digits = 2)
+
+# m=20
+mod120 <- with(imp_dat_20,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 day3 = day3,
+                                 day4 = day4,
+                                 day5 = day5,
+                                 day6 = day6,
+                                 day7 = day7,
+                                 day8 = day8)
+               dat_long <- pivot_longer(dat,
+                                        cols = contains("day"),
+                                        names_to = "day",
+                                        values_to = "y")
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod120_df <- summary(mice::pool(mod120)) 
+mod120_df %>% knitr::kable(digits = 2)
+
+# m=50
+mod150 <- with(imp_dat_50,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 day3 = day3,
+                                 day4 = day4,
+                                 day5 = day5,
+                                 day6 = day6,
+                                 day7 = day7,
+                                 day8 = day8)
+               dat_long <- pivot_longer(dat,
+                                        cols = contains("day"),
+                                        names_to = "day",
+                                        values_to = "y")
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod150_df <- summary(mice::pool(mod150)) 
+mod150_df %>% knitr::kable(digits = 2)
+```
+linear trend model
+```{r}
+# imp_dat_10 <- mice(data_wide, m=10,
+#                 printFlag = FALSE,
+#                 predictorMatrix = pred,
+#                 seed = 2022)
+# imp_dat_20 <- mice(data_wide, m=20,
+#                 printFlag = FALSE,
+#                 predictorMatrix = pred,
+#                 seed = 2022)
+# imp_dat_50 <- mice(data_wide, m=50,
+#                 printFlag = FALSE,
+#                 predictorMatrix = pred,
+#                 seed = 2022)
+
+# fit the models to the imputed data
+# m=10
+mod210 <- with(imp_dat_10,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 `3` = day3,
+                                 `4` = day4,
+                                 `5` = day5,
+                                 `6` = day6,
+                                 `7` = day7,
+                                 `8` = day8,
+                                 check.names=FALSE)
+               
+               dat_long <- melt(dat,
+                                id.vars = c("PATIENT", "treat"),
+                                value.name = "y") %>% mutate(day=ifelse(variable==3, 0,
+                                                                        ifelse(variable==4, 1, 
+                                                                               ifelse(variable==5, 2, 
+                                                                                      ifelse(variable==6,3,
+                                                                                             ifelse(variable==7,4,5))))))
+
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod210_df <- summary(mice::pool(mod210)) 
+mod210_df %>% knitr::kable(digits = 2)
+
+# m=20
+mod220 <- with(imp_dat_20,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 `3` = day3,
+                                 `4` = day4,
+                                 `5` = day5,
+                                 `6` = day6,
+                                 `7` = day7,
+                                 `8` = day8,
+                                 check.names=FALSE)
+               
+               dat_long <- melt(dat,
+                                id.vars = c("PATIENT", "treat"),
+                                value.name = "y") %>% mutate(day=ifelse(variable==3, 0,
+                                                                        ifelse(variable==4, 1, 
+                                                                               ifelse(variable==5, 2, 
+                                                                                      ifelse(variable==6,3,
+                                                                                             ifelse(variable==7,4,5))))))
+
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod220_df <- summary(mice::pool(mod220)) 
+mod220_df %>% knitr::kable(digits = 2)
+
+# m=50
+mod250 <- with(imp_dat_50,
+             {
+               dat <- data.frame(treat = treat,
+                                 PATIENT = PATIENT,
+                                 `3` = day3,
+                                 `4` = day4,
+                                 `5` = day5,
+                                 `6` = day6,
+                                 `7` = day7,
+                                 `8` = day8,
+                                 check.names=FALSE)
+               
+               dat_long <- melt(dat,
+                                id.vars = c("PATIENT", "treat"),
+                                value.name = "y") %>% mutate(day=ifelse(variable==3, 0,
+                                                                        ifelse(variable==4, 1, 
+                                                                               ifelse(variable==5, 2, 
+                                                                                      ifelse(variable==6,3,
+                                                                                             ifelse(variable==7,4,5))))))
+
+               lme(y ~ day*treat,
+                   random = ~1|PATIENT,
+                   data = dat_long)
+             })
+
+mod250_df <- summary(mice::pool(mod250)) 
+mod250_df %>% knitr::kable(digits = 2)
+```
+```{r}
+# stack mod_df
+df_1 <- gdata::combine(mod11_df,mod110_df, mod120_df, mod150_df)
+df_1$source <- factor(df_1$source)
+levels(df_1$source) = c("m=5", "m=10", "m=20", "m=50")
+                  
+df_1$term <- str_replace(df_1$term, "dayday", "dayN")
+df_1$term <- str_replace(df_1$term, "treatPLACEBO", "Placebo")                  
+
+
+df_2 <- gdata::combine(mod22_df,mod210_df, mod220_df, mod250_df)
+df_2$source <- factor(df_2$source)
+levels(df_2$source) = c("m=5", "m=10", "m=20", "m=50")
+
+
+df_2$term <- str_replace(df_2$term, "dayday", "dayN")
+df_2$term <- str_replace(df_2$term, "treatPLACEBO", "Placebo")
+
+
+# plot
+pd <- position_dodge(0.5) # move them .05 to the left and right
+
+ggplot(df_1, aes(x=term, y=estimate, colour=source, group=source)) + 
+    geom_errorbar(aes(ymin=estimate-std.error, ymax=estimate+std.error), colour="black", width=.1, position=pd) +
+    geom_point(position=pd, size=3, shape=21, fill="white") + # 21 is filled circle
+    xlab("Term") +
+    ylab("Estimate") +
+    scale_colour_hue(name="Number of Imputation",    # Legend label, use darker colors
+                     labels=c("5", "10", "20", "50"),
+                     l=40) +                    # Use darker colors, lightness=40
+    expand_limits(y=0) +                        # Expand y range
+    scale_y_continuous(breaks=0:20*4) +         # Set tick every 4
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position="top", legend.box = "horizontal") 
+
+
+ggsave("est_comparison_1.png", width = 8, height = 4)
+
+ggplot(df_2, aes(x=term, y=estimate, colour=source, group=source)) + 
+    geom_errorbar(aes(ymin=estimate-std.error, ymax=estimate+std.error), colour="black", width=.1, position=pd) +
+    geom_point(position=pd, size=3, shape=21, fill="white") + # 21 is filled circle
+    xlab("Term") +
+    ylab("Estimate") +
+    scale_colour_hue(name="Number of Imputation",    # Legend label, use darker colors
+                     labels=c("5", "10", "20", "50"),
+                     l=40) +                    # Use darker colors, lightness=40
+    expand_limits(y=0) +                        # Expand y range
+    scale_y_continuous(breaks=0:20*4) +         # Set tick every 4
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position="top", legend.box = "horizontal") 
+
+ggsave("est_comparison_2.png", width = 8, height = 4)
+```
+
+
+
 
 
 ### diagnostics
@@ -368,6 +615,7 @@ png(filename="./MHOWS_his.png",  width=600)
 histogram(data$MHOWS)
 dev.off()
 ```
+
 #### mixed model diagnostics
 ```{r}
 # select the first complete dataset to fit lme
