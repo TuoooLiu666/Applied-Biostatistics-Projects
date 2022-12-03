@@ -2,12 +2,14 @@
 title: "Statistical Analysis Plan"
 author: "Tuo Liu"
 date: "`r Sys.Date()`"
-output: word_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt, pwr)
+pacman::p_load(tidyverse, DataExplorer, arsenal, MatchIt, Hmisc, RItools, tableone, optmatch, marginaleffects, rgenoud,Matching, pwr)
 ```
 ### Introduction
 Smoking cessation is linked to various health effects, such as lower risk of cardiovascular diseases and 90% reduction in the risk of death9(1). While most of these effects are beneficial, weight gain is hard to label because some individuals would experience excessive weight gain and develop obesity onset and diabetes after smoking cessation(2). To add on existing knowledge of the association between smokign cessation and weight gain and to unveil the driving factors of weight gain, we will conduct an anlysis using data from the National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS).
@@ -47,19 +49,19 @@ Another focus of the project would be to develop an understanding of how propens
 - Education: 8th grade or less vs High school DROPOUT vs High school vs College dropout vs College or more
 - USE WEIGHT LOSS MEDICATION IN 1971: Yes vs No
 
-#### Data Collected
+#### Data Used
 - Demographics: age in 1971, gender, ethnicity and race, geographical information
+- Socioeconomic factor: income
 - Height (cm) in 1971
-- Activity/exercise level
+- Exercise level
 - Lifestyle: alcohol consumption level, cigarette smoking level
 - Serum cholesterol (mg/100mL) in 1971
 - Weight in kilograms in 1971
 - Weight in kilograms in 1982
 - Weight change in kilograms
-- Systolic blood pressure in 1982
-- Diastolic blood pressure in 1982
+- Blood pressure in 1982
 - Health status in 1971: asthma, chronic bronchitis, chronic cough, heart failure, hepatitis, hayfever, etc.
-- Medication usage for birth control pills, weight loss, high blood pressure, headache, allergies, Bowel trouble,lack of pep, infection, etc.
+- Medication usage for weight loss.
 
 
 #### Primary Outcome & Predictor
@@ -68,11 +70,12 @@ The primary outcome was weight gain (kg) between two 1971 and 1982 visit. This w
 The primary exposure predictor variable was smoking cessation, defined as treated if subjects reported having quit smoking before the follow-up visit in 1982, and as untreated otherwise according to the questionnaire and interview feedback. 
 
 #### Preliminary Analysis for the primary outcome, predictor and covariates
+__sex, age, education, duration of smoking and other features__
 Subjects with missing value on weight difference between 1971 and 1982 (N=63) will be removed. Subjects who used weight loss medication (N=41) will also be excluded from this analysis. The final analysis set contains 1525 subjects. Table 1 presents a summary of the final analysis set before PS matching by stratification on smoking cessation status (Yes/No).
 
 ```{r results='asis'}
-data <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
-
+data_ori <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
+data <- data_ori %>% select(2,9:13, 15, 16,19,23,39,54,57) 
 
 # data prep
 data <- data %>% mutate(
@@ -86,7 +89,7 @@ data <- data %>% mutate(
             exercise=factor(exercise)
             )
 
-levels(data$qsmk) <- c("No", "Yes")
+# levels(data$qsmk) <- c("No", "Yes")
 levels(data$sex) <- c("Male", "Female")
 levels(data$race) <- c("White", "Other")
 levels(data$education) <- c("8th grade or less", "High school DROPOUT", "High school","College dropout", "College or more")
@@ -94,6 +97,8 @@ levels(data$marital) <- c('Married', 'Widowed', 'Never married', 'Divorced', 'Se
 levels(data$alcoholfreq) <- c('Almost every day',  '2-3 times/week','1-4 times/month', '< 12 times/year', 'No alcohol last year', NA)
 levels(data$exercise) <- c('much exercise','moderate exercise','little or no exercise')
 
+# missing
+# DataExplorer::plot_missing(data)
 
 # descriptive statistics for table 1
 my_labels <- list(
@@ -127,7 +132,10 @@ my_controls <- tableby.control(
   )
 )
 
-table <- arsenal::tableby(qsmk ~  sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise + ht + cholesterol + wt82_71, data = data, control = my_controls)
+table <- arsenal::tableby(qsmk ~  sex + age + race + marital + ht + 
+                            education  + smokeyrs + alcoholfreq + exercise + cholesterol + wt82_71, 
+                          data = data_ori, 
+                          control = my_controls)
 
 summary(table,
   labelTranslations = my_labels,
@@ -141,27 +149,182 @@ summary(table,
 
 #### Covariate Imbalance Across Treatment Groups
 Before PS is calculated, it is a good practice to determine if the two groups are balanced regarding covariates. We will calculate the standardized mean difference(SMD) which is often used as a balance measure of individual covariates before and after propensity score matching.  As SMD is standardized, comparison across variables on different scales is possible. Any absolute SMD scores higher than __25%__ may indicate an imbalance for that variable across treament groups and predictor variables with a high SMD score will be included into the PS calculation model. We will also conduct an omnibus $\chi^2$ test on the balance across treatment groups. A statistically significant $\chi^2$ will indicate that at least one of the predictor variables is creating an imbalance between treatment groups. 
+```{r}
+data_com <- data %>% na.omit()
+### SMD score: .25
+## Covariates
+vars <- c("age","ht","sex","race","education","income", "marital",'smokeyrs' , 
+          'alcoholfreq' , 'exercise', 'cholesterol')
+
+## Construct a table
+tabUnmatched <- CreateTableOne(vars = vars, strata = "qsmk", 
+                               data = data_com, 
+                               test = FALSE)
+## Show table with SMD
+print(tabUnmatched, smd = TRUE) %>% knitr::kable()
 
 
-#### Propensity Score Calculation
+### Calculates  the propensity  score
+ps <- glm(qsmk ~ sex + age + race + marital + education + income + smokeyrs + 
+            alcoholfreq + exercise + ht + cholesterol, 
+          data=data_com,   
+          family  = binomial())
+summary(ps)
+```
+
+```{r}
+### omnibus test on covariate balance
+xBalance(as.numeric(qsmk) ~ sex + age + race + marital + education + income + smokeyrs + 
+           alcoholfreq + exercise + ht + cholesterol, 
+         data = data_com,  
+         report  = c("chisquare.test"))
+
+### Attach  the predicted   propensity  score   to  the data
+data_com$psvalue <- predict(ps,  type    = "response")
+## Back    to  back    histogram
+Hmisc::histbackback(split(data_com$psvalue,  data_com$qsmk), 
+                    main= "Propensity score before matching",
+                    xlab=c("Continuer", "Quitter"))
+```
+
+
+#### Propensity Score Calculation & Matching
 We will run a logit regression model with __Treatment__ being the response variable to further identify potential confounders. All available predictor variables, except the outcome, will be included into the model. Any statistically significant predictor variables will be included in PS calculation model. Additionally, based on prior knowledge, predictor variables suspected to be associated with the outcome  will be included in the PS calculation model.  We will calculate the PS score using a logit model regressing on the treatment variable with the covariates identified in previous steps being the predictor variables. Variables that create imbalance between treatment groups shall be identified now.
 
-#### Propensity Score Matching
 We will carry out PS score matching using R package MatchIt. We will inspect goodness of matching by a combination of graphical and tabular approach. MatchIt provides summary tables that include mean(SD) for both treatment groups before and after matching, and figures demonstrating percentage improvement for the imbalance. We are aware of the fact that various matching algorithms are available in MatchIt, and we shall examine the impact of different algorithms on the relationship between the primary treatment and the primary outcome.
+```{r}
+#---1:1 Nearest Neighbor PS matching w/o replacement
+m.nn <- matchit(qsmk ~ sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise, 
+                distance = "glm",
+                link = "logit",
+                data = data_com,   
+                method = "nearest",  
+                ratio = 1)
+# plot summary(m.nn)
+plot(summary(m.nn))
+match.data = match.data(m.nn)
+#---Computing   indices of  covariate   imbalance   after   matching
+vars <- c("age","sex","race","education", "marital",'smokeyrs' , 'alcoholfreq' , 'exercise')
+### 1.  Standardized    difference
+## Construct a table
+tabmatched <- CreateTableOne(vars = vars, strata = "qsmk", 
+                             data = match.data,
+                             test = FALSE)
+## Show table with SMD
+print(tabmatched, smd = TRUE)
 
+### 2.  chi-square  test
+xBalance(as.numeric(qsmk)  ~ sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise, 
+         data = match.data,   
+         report  = c("chisquare.test"))
+
+### 3. Plot IMbalance after matching: selection bias has been reduced
+histbackback(split(match.data$psvalue,   match.data$qsmk),  
+             main= "Propensity score after matching",    
+             xlab=c("Continuer",   "Quitter"))
+```
 
 #### Outcome Analyis 
-We will fit a simple linear regression model on the primary outcome (weight gain) and the treatment variable, and we will then fit a multi-variable linear regression model and apply the backward stepwise selection method to construct the final model and estimate the treatment effect. Multicolliearity will be inspected using the simple correlation matrix, and model assumptions will be checked using a graphical approach.
+With matched samples, We conducted paired t-test on the primary outcome (weight gain) and the treatment variable to test whether the effect of smoking cessation on weight gain is significant.
+```{r}
+#---Outcome	analysis	using	lm()
+fit <- lm(wt82_71 ~ qsmk * (sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise), 
+          data = match.data, weights = weights)
 
+comp <- comparisons(fit,
+                     variables = "qsmk",
+                     vcov = ~subclass,
+                     newdata = subset(match.data, qsmk == 1),
+                     wts = "weights")
+summary(comp)
+```
 
 #### Sensitivity Analysis
-Available matching algorithms will be applied in the PS score matching step. We will calculate the treatment effect for each algorithm and compare it across various algorithms.
+Various matching algorithms are available for matching propensity scores cross treatment groups: near neighbor matching w/o caliber, optimal, full, exact, 
+Available matching algorithms and matching ratios of 1:2 and 1:3 will be applied in the PS score matching step. We will compare the treatment effect across various algorithms and matching ratios.
+All analysis will be conducted in R (version 4.1.3).
 
-All analysis will be conducted in R (version 4.1.1).
+##### various algorithms
+```{r}
+df_md <- data.frame()
+
+for (i in c("nearest", "optimal",  "full", "genetic")){
+  m <- matchit(qsmk ~ sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise, 
+                 distance = "glm", link = "logit",
+                 data = data_com,   
+                 method = i,  
+                 ratio  = 1)
+  
+  match.data <- match.data(m)
+  ## Construct a table
+  tabmatched <- CreateTableOne(vars = vars, strata = "qsmk", data = match.data, test = FALSE)
+  ## Show table with SMD
+  print(tabmatched, smd = TRUE)
+  ## plot imbalance
+  histbackback(split(match.data$psvalue,   match.data$qsmk),
+             main= "Propensity score after matching",
+             xlab=c("Continuer",   "Quitter"))
+  
+  fit <- lm(wt82_71 ~ qsmk * (sex + age + race + marital + 
+                                education + smokeyrs + alcoholfreq + exercise), 
+          data = match.data, weights = weights)
+
+  comp <- summary(comparisons(fit,
+                     variables = "qsmk",
+                     vcov = ~subclass,
+                     newdata = subset(match.data, qsmk == 1),
+                     wts = "weights"))
+  
+  df_md <- rbind(df_md, comp %>% as.data.frame())
+  
+}
+
+df_md <-  df_md %>% mutate(method=c("nearest", "optimal", "full", "genetic"))
+df_md
+```
+
+
+
+##### various matching ratio/caliper
+```{r}
+df_ratio <- data.frame()
+
+for (i in 1:2){
+  m <- matchit(qsmk ~ sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise, 
+                 distance = "glm", link = "logit",
+                 data = data_com,   
+                 method = "nearest",  
+                 ratio  = i)
+  
+  match.data <- match.data(m)
+  ## Construct a table
+  tabmatched <- CreateTableOne(vars = vars, strata = "qsmk", data = match.data, test = FALSE)
+  ## Show table with SMD
+  print(tabmatched, smd = TRUE)
+  ## plot imbalance
+  histbackback(split(match.data$psvalue,   match.data$qsmk),
+             main= "Propensity score after matching",
+             xlab=c("Continuer",   "Quitter"))
+  
+  fit <- lm(wt82_71 ~ qsmk * (sex + age + race + marital + education + smokeyrs + alcoholfreq + exercise), 
+          data = match.data, weights = weights)
+
+  comp <- summary(comparisons(fit,
+                     variables = "qsmk",
+                     vcov = ~subclass,
+                     newdata = subset(match.data, qsmk == 1),
+                     wts = "weights"))
+  
+  df_ratio <- rbind(df_ratio, comp %>% as.data.frame())
+}
+
+df_ratio <-  df_ratio %>% mutate(ratio=c(1,2))
+df_ratio
+```
+
 
 ### Handling of Missing and Incomplete Data
 In case of missing data for any variable, the information on the number of subjects with missing data will be displayed in Table 1. For categorical variables, the percentages will be calculated based on all available data (missing and non-missing). The subjects with missing information will be included in the calculations. No imputation rules will be applied. 
-
 
 
 ### Power analysis
@@ -171,6 +334,8 @@ pwr.t2n.test(n1 = 396, n2= 396, d = 0.5, sig.level =0.05)
 ```
 
 ### Reference
+
+
 
 ### Appendix
 
