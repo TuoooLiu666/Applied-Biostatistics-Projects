@@ -7,7 +7,7 @@ output: word_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2,broom.mixed, ggResidpanel,gplots)
+pacman::p_load(tidyverse, nlme, arsenal, mice, lattice, DataExplorer, reshape2,broom.mixed, ggResidpanel,gplots, gdata)
 ```
 
 ### Study Description
@@ -239,7 +239,7 @@ mod11 <- with(imp_dat,
                    data = dat_long)
              })
 
-mod11_df <- summary(mice::pool(mod11)) 
+mod11_df <- summary(mice::pool(mod11),conf.int = TRUE) 
 mod11_df %>% knitr::kable(digits = 2)
 ```
 ##### Mixed-MI: numerical time-parametric trend
@@ -270,7 +270,7 @@ mod22 <- with(imp_dat,
                    data = dat_long)
              })
 
-mod22_df <- summary(mice::pool(mod22)) 
+mod22_df <- summary(mice::pool(mod22),conf.int = TRUE) 
 mod22_df %>% knitr::kable(digits = 2)
 ```
 
@@ -396,7 +396,7 @@ mod110 <- with(imp_dat_10,
                    data = dat_long)
              })
 
-mod110_df <- summary(mice::pool(mod110)) 
+mod110_df <- summary(mice::pool(mod110),conf.int = TRUE) 
 mod110_df %>% knitr::kable(digits = 2)
 
 # m=20
@@ -419,7 +419,7 @@ mod120 <- with(imp_dat_20,
                    data = dat_long)
              })
 
-mod120_df <- summary(mice::pool(mod120)) 
+mod120_df <- summary(mice::pool(mod120),conf.int = TRUE) 
 mod120_df %>% knitr::kable(digits = 2)
 
 # m=50
@@ -442,7 +442,7 @@ mod150 <- with(imp_dat_50,
                    data = dat_long)
              })
 
-mod150_df <- summary(mice::pool(mod150)) 
+mod150_df <- summary(mice::pool(mod150),conf.int = TRUE) 
 mod150_df %>% knitr::kable(digits = 2)
 ```
 linear trend model
@@ -487,7 +487,7 @@ mod210 <- with(imp_dat_10,
                    data = dat_long)
              })
 
-mod210_df <- summary(mice::pool(mod210)) 
+mod210_df <- summary(mice::pool(mod210),conf.int = TRUE) 
 mod210_df %>% knitr::kable(digits = 2)
 
 # m=20
@@ -516,7 +516,7 @@ mod220 <- with(imp_dat_20,
                    data = dat_long)
              })
 
-mod220_df <- summary(mice::pool(mod220)) 
+mod220_df <- summary(mice::pool(mod220),conf.int = TRUE) 
 mod220_df %>% knitr::kable(digits = 2)
 
 # m=50
@@ -545,7 +545,7 @@ mod250 <- with(imp_dat_50,
                    data = dat_long)
              })
 
-mod250_df <- summary(mice::pool(mod250)) 
+mod250_df <- summary(mice::pool(mod250),conf.int = TRUE) 
 mod250_df %>% knitr::kable(digits = 2)
 ```
 ```{r}
