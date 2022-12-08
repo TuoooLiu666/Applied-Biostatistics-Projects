@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt)
+pacman::p_load(tidyverse, DataExplorer, arsenal, matchIt, Hmisc)
 ```
 
 ### study description
@@ -25,7 +25,6 @@ The outcome variable was subjects' body weight.
 ### data read-in
 ```{r}
 data <- read.csv("./data/nhefs.csv") %>% filter(!is.na(wt82_71) & wtloss != 1)
-colnames(data)
 ```
 
 
@@ -62,8 +61,7 @@ my_labels <- list(
 # # attr(data$SEX,'label')  <- 'Gender'
 # # attr(data$PERIOD,'label')  <- 'Examination Cycle'
 # # attr(data$CVD,'label')  <- 'CVD Status'
-# 
-# 
+
 my_controls <- tableby.control(
   test = F,
   total = F,
