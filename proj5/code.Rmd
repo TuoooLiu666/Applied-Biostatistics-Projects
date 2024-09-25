@@ -1,0 +1,279 @@
+---
+title: "code"
+author: "Tuo Liu"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+## load packages from CRAN
+pacman::p_load(rio,          # File import
+               here,         # File locator
+               tidyverse,    # data management + ggplot2 graphics
+               tsibble,      # handle time series datasets
+               survey,       # for survey functions
+               srvyr,        # dplyr wrapper for survey package
+               gtsummary,    # wrapper for survey package to produce tables
+               apyramid,     # a package dedicated to creating age pyramids
+               patchwork,    # for combining ggplots
+               ggforce,      # for alluvial/sankey plots
+               survival,
+               janitor
+               ) 
+
+## load packages from github
+pacman::p_load_gh(
+     "R4EPI/sitrep"          # for observation time / weighting functions
+)
+```
+
+## Introduction
+
+Survival analysis focuses on describing a defined point of event called the failure (onset of a disease, cure from a disease, death...) that occurs after a period of time called failure time during which individuals are observed, for a given individual or group of individuals.
+
+A time of origin or the start of observation is necessary to determine the failure time. The inferential target for survial analysis is the time between an origin and an event.  For example, in clinical studies it is used to assess the effect of a treatment for instance, or to assess a large variety of cancer survival measures.  
+
+Censoring: Censoring occurs when at the end of follow-up, some of the individuals have not had the event of interest, and thus their true time to event is unknown.
+
+## Data Prep
+```{r}
+# import linelist
+linelist_case_data <- rio::import("linelist_cleaned.rds")
+```
+
+survival data can be described as having the following three characteristics:
+
+- the dependent variable or response is the waiting time until the occurrence of a well-defined event,
+- observations are censored, in the sense that for some units the event of interest has not occurred at the time the data are analyzed, and
+- there are predictors or explanatory variables whose effect on the waiting time we wish to assess or control.
+
+```{r}
+#create a new data called linelist_surv from the linelist_case_data
+
+linelist_surv <-  linelist_case_data %>% 
+  dplyr::filter(
+       # remove observations with wrong or missing dates of onset or date of outcome
+       date_outcome > date_onset) %>% 
+  dplyr::mutate(
+       # create the event var which is 1 if the patient died and 0 if he was right censored
+       event = ifelse(is.na(outcome) | outcome == "Recover", 0, 1),
+       # create the var on the follow-up time in days
+       futime = as.double(date_outcome - date_onset),
+       # create a new age category variable with only 3 strata levels
+       age_cat_small = dplyr::case_when( 
+            age_years < 5  ~ "0-4",
+            age_years >= 5 & age_years < 20 ~ "5-19",
+            age_years >= 20   ~ "20+"),
+       # previous step created age_cat_small var as character.
+       # now convert it to factor and specify the levels.
+       # Note that the NA values remain NA's and are not put in a level "unknown" for example,
+       # since in the next analyses they have to be removed.
+       age_cat_small = fct_relevel(age_cat_small, "0-4", "5-19", "20+")
+       )
+
+summary(linelist_surv$futime)
+linelist_surv %>% tabyl(outcome, event)
+linelist_surv %>% tabyl(age_cat_small, age_cat)
+linelist_surv %>% 
+  select(case_id, age_cat_small, date_onset, date_outcome, outcome, event, futime) %>% 
+  head(10)
+```
+
+## Survival Analysis Basics
+
+- Building a surv-type object
+
+```{r}
+# Use Suv() syntax for right-censored data
+survobj <- Surv(time = linelist_surv$futime,
+                event = linelist_surv$event)
+head(survobj, 10)
+```
+- running initial analyses
+  - survfit object
+  - life table
+    - the number of people who were at risk of developing the event (people who did not
+    have the event yet nor were censored: n.risk)
+    - those who did develop the event (n.event)
+    - and from the above: the probability of not developing the event (probability of not
+    dying, or of surviving past that specific time)
+    - the standard error and the confidence interval for that probability are derived and
+    displayed
+
+```{r}
+# fit the KM estimates using a formula where the Surv object "survobj" is the response variable.
+# "~ 1" signifies that we run the model for the overall survival  
+linelistsurv_fit <-  survival::survfit(survobj ~ 1)
+
+#print its summary at specific times
+summary(linelistsurv_fit, times = c(5,10,20,30,60))
+```
+- cumulative hazard: the instantaneous rate of event occurrence
+- plotting Kaplan-Meir curves
+
+```{r}
+# original plot
+plot(
+  linelistsurv_fit,
+  xlab = "Days of follow-up",       
+  ylab = "Survival Probability",       
+  mark.time = TRUE,              # mark events on the curve: a "+" is printed at every event
+  conf.int = FALSE,              # do not plot the confidence interval
+  main = "Overall survival curve and cumulative mortality"
+  )
+
+# draw an additional curve to the previous plot
+lines(
+  linelistsurv_fit,
+  lty = 3,             # use different line type for clarity
+  fun = "event",       # draw the cumulative events instead of the survival 
+  mark.time = FALSE,
+  conf.int = FALSE
+  )
+
+# add a legend to the plot
+legend(
+  "topright",                               # position of legend
+  legend = c("Survival", "Cum. Mortality"), # legend text 
+  lty = c(1, 3),                            # line types to use in the legend
+  cex = .85,                                # parametes that defines size of legend text
+  bty = "n"                                 # no box type to be drawn for the legend
+  )
+```
+
+
+## Comparison of survival curves
+
+To compare the survival within different groups of our observed participants or patients, we might need to first look at their respective survival curves and then run tests to evaluate the difference between independent groups.
+
+
+- Log rank test
+
+```{r}
+# create the new survfit object based on gender
+linelistsurv_fit_sex <-  survfit(Surv(futime, event) ~ gender, data = linelist_surv)
+
+# set colors
+col_sex <- c("lightgreen", "red")
+
+# create plot
+plot(
+  linelistsurv_fit_sex,
+  col = col_sex,
+  xlab = "Days of follow-up",
+  ylab = "Survival Probability")
+
+# add legend
+legend(
+  "topright",
+  legend = c("Female","Male"),
+  col = col_sex,
+  lty = 1,
+  cex = .9,
+  bty = "n")
+
+#compute the test of the difference between the survival curves
+survival::survdiff(
+  Surv(futime, event) ~ gender, 
+  data = linelist_surv
+  )
+```
+Some other R packages allow illustrating survival curves for different groups and testing the difference all at once.
+
+```{r warning=FALSE}
+
+survminer::ggsurvplot(
+    linelistsurv_fit_sex, 
+    data = linelist_surv,          # again specify the data used to fit linelistsurv_fit_sex 
+    conf.int = FALSE,              # do not show confidence interval of KM estimates
+    surv.scale = "percent",        # present probabilities in the y axis in %
+    break.time.by = 10,            # present the time axis with an increment of 10 days
+    xlab = "Follow-up days",
+    ylab = "Survival Probability",
+    pval = T,                      # print p-value of Log-rank test 
+    pval.coord = c(40,.91),        # print p-value at these plot coordinates
+    risk.table = T,                # print the risk table at bottom 
+    legend.title = "Gender",       # legend characteristics
+    legend.labs = c("Female","Male"),
+    font.legend = 10, 
+    palette = "Dark2",             # specify color palette 
+    surv.median.line = "hv",       # draw horizontal and vertical lines to the median survivals
+    ggtheme = theme_light()        # simplify plot background
+)
+```
+
+```{r warning=FALSE}
+linelistsurv_fit_source <-  survfit(
+  Surv(futime, event) ~ source,
+  data = linelist_surv
+  )
+
+# plot
+survminer::ggsurvplot( 
+  linelistsurv_fit_source,
+  data = linelist_surv,
+  size = 1, linetype = "strata",   # line types
+  conf.int = T,
+  surv.scale = "percent",  
+  break.time.by = 10, 
+  xlab = "Follow-up days",
+  ylab= "Survival Probability",
+  pval = T,
+  pval.coord = c(40,.91),
+  risk.table = T,
+  legend.title = "Source of \ninfection",
+  legend.labs = c("Funeral", "Other"),
+  font.legend = 10,
+  palette = c("#E7B800","#3E606F"),
+  surv.median.line = "hv", 
+  ggtheme = theme_light()
+)
+```
+
+## Cox regression analysis
+
+Cox proportional hazards regression is one of the most popular regression techniques for survival analysis. Other models can also be used since the Cox model requires important assumptions that need to be verified for an appropriate use. 
+
+In a Cox proportional hazards regression model, the measure of effect is the hazard rate (HR), which is the risk of failure (or the risk of death in our example), given that the participant has survived up to a specific time. Usually, we are interested in comparing independent groups with respect to their hazards, and we use a hazard ratio, which is analogous to an odds ratio in the setting of multiple logistic regression analysis. 
+
+```{r}
+#fitting the cox model
+linelistsurv_cox_sexage <-  survival::coxph(
+              Surv(futime, event) ~ gender + age_cat_small, 
+              data = linelist_surv
+              )
+
+
+#summary of the model
+summary(linelistsurv_cox_sexage)
+```
+The function `cox.zph()` from survival package may be used to test the proportional hazards assumption for a Cox regression model fit.
+
+```{r}
+test_ph_sexage <- survival::cox.zph(linelistsurv_cox_sexage)
+test_ph_sexage
+```
+```{r}
+#fit the model
+linelistsurv_cox <-  coxph(
+                        Surv(futime, event) ~ gender + age_years + 
+                          source + days_onset_hosp,
+                        data = linelist_surv
+                        )
+
+
+#test the proportional hazard model
+linelistsurv_ph_test <- cox.zph(linelistsurv_cox)
+linelistsurv_ph_test
+```
+The graphical verification of this assumption may be performed with the function ggcoxzph() from the survminer package.
+
+```{r}
+survminer::ggcoxzph(linelistsurv_ph_test)
+```
+
+```{r}
+survminer::ggforest(linelistsurv_cox, data = linelist_surv)
+```
+

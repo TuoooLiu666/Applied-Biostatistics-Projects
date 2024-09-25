@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load(survey, tidyverse, DataExplorer, arsenal, survey, gtsummary)
+pacman::p_load(survey, tidyverse, DataExplorer, arsenal, gtsummary, srvyr)
 ```
 
 
