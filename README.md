@@ -22,3 +22,8 @@ This repository commits to the application of biostatistics knowledge on clinica
   - analytics: propensity score matching and outcome analysis 
   - data source: National Health and Nutrition Examination Survey Data I Epidemiologic Follow Up Study (NHEFS) 1971&1982 follow-up data
   - research question: Is there an effect of smoking cessation on weight gain?
+
+- Proj 5:
+  - analytics: survival analysis, cox proportional hazards model 
+  - data source: simulated Ebola epidemic data
+  - research question: is gender, age a risk factor for Ebola survivability?
